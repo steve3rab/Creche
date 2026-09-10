@@ -309,6 +309,14 @@ test('14 · une note « à affiner » génère une action, qui la ramène à Nor
   const row = page.locator('.list-card').filter({ hasText: 'Affiner la note' });
   await expect(row).toContainText('À faire');
   await row.click();
+  await page.getByRole('dialog').getByRole('link', { name: 'Ouvrir la note source' }).click();
+  await expect(page).toHaveURL(/\/notes\?id=/);
+  const noteDialog = page.getByRole('dialog', { name: 'Revoir le barème CNAF' });
+  await expect(noteDialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(noteDialog).toHaveCount(0);
+  await page.getByRole('link', { name: 'Actions', exact: true }).click();
+  await row.click();
   await page.getByRole('dialog').getByLabel('Statut', { exact: true }).selectOption('TERMINE');
   await page.getByRole('button', { name: 'Enregistrer', exact: true }).click();
   await expect(page.getByRole('status')).toHaveText('Enregistré');
