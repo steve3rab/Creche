@@ -268,6 +268,10 @@ export const shiftSchema = z
     // Shared by every occurrence generated together by a weekly repetition; empty for
     // a one-off slot. Lets an edit or deletion target "this one" vs "this and later".
     serieId: z.union([idSchema, z.literal('')]).default(''),
+    // Recorded once the shift has happened; unset for a shift that's still upcoming.
+    // Deliberately excluded from the series template and bulk patch — attendance is
+    // always per-occurrence, never something a repetition could set in advance.
+    statut: z.enum(['PRESENT', 'ABSENT']).nullable().default(null),
   })
   .refine((s) => s.heureFin > s.heureDebut, {
     message: 'L’heure de fin doit être après l’heure de début.',

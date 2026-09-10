@@ -186,6 +186,20 @@ describe('Planning, contacts et rappels', () => {
     expect(shiftSchema.safeParse({ ...base, heureFin: '08:00' }).success).toBe(false);
     expect(shiftSchema.safeParse({ ...base, heureFin: '07:00' }).success).toBe(false);
   });
+  it('un créneau de garde n’a pas de statut de présence par défaut, et accepte présent ou absent', () => {
+    const base = {
+      ...newBase(),
+      date: '2026-09-15',
+      heureDebut: '08:00',
+      heureFin: '12:00',
+      membreId: crypto.randomUUID(),
+      membre: 'Léa Martin',
+    };
+    expect(shiftSchema.parse(base).statut).toBeNull();
+    expect(shiftSchema.parse({ ...base, statut: 'PRESENT' }).statut).toBe('PRESENT');
+    expect(shiftSchema.parse({ ...base, statut: 'ABSENT' }).statut).toBe('ABSENT');
+    expect(shiftSchema.safeParse({ ...base, statut: 'EN_RETARD' }).success).toBe(false);
+  });
   it('exige un nom pour un contact mais accepte des coordonnées vides', () => {
     const contact = contactSchema.parse({ ...newBase(), nom: 'CAF de Paris' });
     expect(contact.structure).toBe('');

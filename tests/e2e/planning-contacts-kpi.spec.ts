@@ -80,6 +80,45 @@ test('planning : série hebdomadaire — création, modification et suppression 
   expect(remaining.map((s) => s.date)).toEqual(['2026-09-07']);
 });
 
+test('planning : affiche le mois en cours et le prénom de l’enfant plutôt que le responsable', async ({
+  page,
+  workspace,
+}) => {
+  const [leaMartin] = workspace.seeded.members;
+  await workspace.store.saveRecord('membres', { ...leaMartin, prenomEnfant: 'Milo' });
+
+  await page.goto(workspace.url + '/planning');
+  await expect(page.locator('.planning-month')).toHaveText('septembre 2026');
+
+  await page.getByRole('button', { name: 'Créneau', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Nouveau créneau' });
+  await dialog.getByLabel('Responsable', { exact: true }).selectOption({ label: 'Léa Martin' });
+  await dialog.getByLabel('Heure de début', { exact: true }).fill('08:00');
+  await dialog.getByLabel('Heure de fin', { exact: true }).fill('12:00');
+  await dialog.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Créneau enregistré');
+
+  // Two parents of the same child both refer to just the child on the card — like
+  // in the PDFs — not to whichever of them actually signed up for the shift.
+  const card = page.locator('.shift-card', { hasText: '08:00–12:00' });
+  await expect(card).toContainText('Milo');
+  await expect(card).not.toContainText('Léa Martin');
+  await expect(card).not.toHaveClass(/shift-present|shift-absent/);
+
+  await card.click();
+  const editDialog = page.getByRole('dialog', { name: 'Modifier le créneau' });
+  await editDialog.getByLabel('Statut', { exact: true }).selectOption('PRESENT');
+  await editDialog.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Créneau enregistré');
+  await expect(card).toHaveClass(/shift-present/);
+
+  await card.click();
+  await editDialog.getByLabel('Statut', { exact: true }).selectOption('ABSENT');
+  await editDialog.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Créneau enregistré');
+  await expect(card).toHaveClass(/shift-absent/);
+  expect((await workspace.store.list('planning'))[0]).toMatchObject({ statut: 'ABSENT' });
+});
 test('planning : refuse une heure de fin antérieure à l’heure de début', async ({ page }) => {
   await page.getByRole('link', { name: 'Planning', exact: true }).click();
   await page.getByRole('button', { name: 'Créneau', exact: true }).click();

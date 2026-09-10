@@ -1225,6 +1225,11 @@ details textarea {
 .month-toolbar h2 {
   text-transform: capitalize;
 }
+.planning-month {
+  text-transform: capitalize;
+  font-weight: 650;
+  color: var(--text);
+}
 .push-right {
   margin-left: auto;
 }
@@ -1378,16 +1383,33 @@ details textarea {
   flex-direction: column;
   gap: 2px;
   border: 0;
+  border-left: 3px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  background: var(--accent-soft);
-  color: var(--accent-hover);
-  padding: 6px 7px;
+  background: var(--bg-panel-strong);
+  color: var(--text);
+  padding: 6px 7px 6px 6px;
   text-align: left;
   font-size: 10px;
 }
 .shift-card:hover {
+  background: var(--bg-panel-hover);
+}
+.shift-card.shift-present {
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+}
+.shift-card.shift-present:hover {
   background: var(--accent-strong);
   color: var(--accent-contrast);
+}
+.shift-card.shift-absent {
+  border-left-color: var(--danger);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.shift-card.shift-absent:hover {
+  filter: brightness(1.15);
 }
 .shift-time {
   display: inline-flex;
@@ -1414,9 +1436,14 @@ details textarea {
 }
 .kpi-tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 10px;
   margin-bottom: 16px;
+}
+@media (max-width: 760px) {
+  .kpi-tiles {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 .kpi-tile {
   background: var(--bg-panel);
@@ -1445,8 +1472,21 @@ details textarea {
 }
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 14px;
+}
+/* A panel left alone on the last row (i.e. panel count ≡ 1 mod 3) spans full width
+   instead of sitting stranded in the first column with two empty slots beside it. */
+.kpi-panel:last-child:nth-child(3n + 1) {
+  grid-column: 1 / -1;
+}
+@media (max-width: 760px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+  .kpi-panel:last-child:nth-child(3n + 1) {
+    grid-column: auto;
+  }
 }
 .kpi-panel h2 {
   margin-bottom: 10px;

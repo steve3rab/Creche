@@ -67,6 +67,19 @@ const days = computed(() =>
 const weekLabel = computed(
   () => `${prettyDate(weekStart.value)} → ${prettyDate(addDays(weekStart.value, 6))}`,
 );
+const monthLabel = computed(() =>
+  new Date(weekStart.value + 'T12:00:00').toLocaleDateString('fr-FR', {
+    month: 'long',
+    year: 'numeric',
+  }),
+);
+// Two parents of the same child both show up as the shift's "responsable"; displaying
+// the child's name instead — the same substitution the PDFs already make — means both
+// parents' shifts read as referring to the one child, not two different people.
+function shiftChildName(shift: Shift) {
+  const member = state.members.find((m) => m.id === shift.membreId);
+  return member?.prenomEnfant || member?.nomComplet || shift.membre || 'Non attribué';
+}
 const draft = ref<Shift | null>(null),
   isNew = ref(false),
   error = ref(''),
@@ -87,6 +100,10 @@ function setMember(memberId: string) {
   draft.value.membreId = memberId;
   draft.value.membre = member ? member.nomComplet : '';
 }
+function setStatut(value: string) {
+  if (!draft.value) return;
+  draft.value.statut = value === 'PRESENT' || value === 'ABSENT' ? value : null;
+}
 function create(date: string) {
   isNew.value = true;
   error.value = '';
@@ -101,6 +118,7 @@ function create(date: string) {
     membre: '',
     notes: '',
     serieId: '',
+    statut: null,
   };
 }
 function edit(shift: Shift) {
@@ -215,6 +233,7 @@ async function remove() {
       <Plus :size="16" />Créneau
     </button>
   </div>
+  <p class="muted planning-month">{{ monthLabel }}</p>
   <div class="month-toolbar">
     <button
       aria-label="Semaine précédente"
@@ -245,13 +264,22 @@ async function remove() {
         <strong>{{ day.label }}</strong
         ><span class="muted">{{ day.dateLabel }}</span>
       </header>
-      <button v-for="shift in day.shifts" :key="shift.id" class="shift-card" @click="edit(shift)">
+      <button
+        v-for="shift in day.shifts"
+        :key="shift.id"
+        class="shift-card"
+        :class="{
+          'shift-present': shift.statut === 'PRESENT',
+          'shift-absent': shift.statut === 'ABSENT',
+        }"
+        @click="edit(shift)"
+      >
         <span class="shift-time"
           ><RepeatIcon v-if="shift.serieId" :size="10" />{{ shift.heureDebut }}–{{
             shift.heureFin
           }}</span
         >
-        <span class="shift-member">{{ shift.membre || 'Non attribué' }}</span>
+        <span class="shift-member">{{ shiftChildName(shift) }}</span>
       </button>
       <button class="shift-add" @click="create(day.date)"><Plus :size="12" />Ajouter</button>
     </div>
@@ -284,6 +312,17 @@ async function remove() {
       >
       <label>Heure de début<input v-model="draft.heureDebut" type="time" required /></label>
       <label>Heure de fin<input v-model="draft.heureFin" type="time" required /></label>
+      <label v-if="!isNew"
+        >Statut<select
+          :value="draft.statut || ''"
+          aria-label="Statut"
+          @change="setStatut(($event.target as HTMLSelectElement).value)"
+        >
+          <option value="">Non renseigné</option>
+          <option value="PRESENT">Présent</option>
+          <option value="ABSENT">Absent</option>
+        </select></label
+      >
       <label class="full">Notes<textarea v-model="draft.notes" rows="2" /></label>
       <template v-if="isNew"
         ><label class="full checkbox"
