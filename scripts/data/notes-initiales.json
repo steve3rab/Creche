@@ -1,0 +1,58 @@
+[
+  {
+    "id": "84d2c9d6-354f-4f35-9f8b-87ea13109401",
+    "titre": "Qu’est-ce qu’une crèche parentale ?",
+    "categorie": "Fonctionnement",
+    "importance": "NORMAL",
+    "contenu": "Une crèche parentale est une crèche où les parents participent directement au fonctionnement de la structure, en collaboration avec des professionnels de la petite enfance.\n\nConcrètement, l’enfant est bien encadré par une équipe qualifiée, mais les parents doivent généralement aussi s’impliquer quelques heures : présence auprès des enfants selon un planning, aide aux activités, courses, tâches administratives ou participation à la gestion de l’association.\n\nLa différence principale avec une crèche classique est donc l’implication des familles. Elle accueille généralement un petit nombre d’enfants, ce qui peut donner une ambiance plus familiale.\n\nEn France, les crèches parentales sont le plus souvent gérées sous forme associative et restent soumises aux règles d’encadrement et de sécurité applicables aux établissements d’accueil du jeune enfant."
+  },
+  {
+    "id": "84d2c9d6-354f-4f35-9f8b-87ea13109402",
+    "titre": "Le rôle du secrétaire de l’association",
+    "categorie": "Secrétariat",
+    "importance": "IMPORTANT",
+    "contenu": "Dans une crèche parentale, le secrétaire fait généralement partie du bureau de l’association qui gère la crèche. Son rôle est surtout administratif et organisationnel ; ce n’est pas forcément lui qui s’occupe de la gestion quotidienne des enfants.\n\nIl peut notamment :\n• préparer et envoyer les convocations aux réunions et assemblées générales ;\n• rédiger les comptes rendus et procès-verbaux ;\n• tenir à jour les documents officiels de l’association."
+  },
+  {
+    "id": "84d2c9d6-354f-4f35-9f8b-87ea13109403",
+    "titre": "Gouvernance et capacité d’accueil",
+    "categorie": "Réglementation",
+    "importance": "IMPORTANT",
+    "contenu": "Dans une crèche parentale, ce n’est ni la CAF ni l’ACEPP qui dirige la crèche.\n\nLa capacité maximale est actuellement limitée à 24 places."
+  },
+  {
+    "id": "84d2c9d6-354f-4f35-9f8b-87ea13109404",
+    "titre": "La PMI : autorisation, sécurité et qualité de l’accueil",
+    "categorie": "Partenaires",
+    "importance": "IMPORTANT",
+    "contenu": "La PMI (Protection maternelle et infantile), qui dépend du département, intervient principalement sur la conformité de l’accueil des enfants.\n\nElle regarde notamment l’organisation de l’établissement, les professionnels, les conditions d’encadrement, les locaux, la sécurité et les conditions d’accueil. La crèche ne peut donc pas décider librement de son fonctionnement simplement parce qu’elle est gérée par les parents.\n\nDonc, très schématiquement :\nPMI = « Est-ce que la crèche peut accueillir les enfants dans ces conditions ? »"
+  },
+  {
+    "id": "84d2c9d6-354f-4f35-9f8b-87ea13109405",
+    "titre": "La CAF : financement et règles conventionnelles",
+    "categorie": "Partenaires",
+    "importance": "IMPORTANT",
+    "contenu": "La CAF est généralement l’un des principaux partenaires financiers.\n\nPour une crèche relevant du système PSU, l’association gestionnaire signe une convention avec la CAF. La CAF verse alors la Prestation de service unique (PSU) et éventuellement différents financements complémentaires.\n\nLa PSU permet notamment de réduire ce que les familles doivent payer. La participation familiale est calculée selon un barème national tenant compte notamment des ressources et de la composition de la famille.\n\nEn contrepartie, la crèche doit respecter les règles CAF : facturation, données d’activité, participations familiales, documents justificatifs, règlement de fonctionnement, etc."
+  },
+  {
+    "id": "84d2c9d6-354f-4f35-9f8b-87ea13109406",
+    "titre": "L’ACEPP : accompagnement, réseau et formation",
+    "categorie": "Partenaires",
+    "importance": "NORMAL",
+    "contenu": "L’ACEPP est très différente des deux précédentes.\n\nCe n’est pas une administration, ce n’est pas l’autorité de contrôle de la crèche, et elle ne remplace ni la CAF ni la PMI.\n\nL’ACEPP est un réseau associatif spécialisé dans les structures parentales et associatives. Elle peut accompagner les crèches sur la gouvernance associative, la gestion, les relations parents-professionnels, les ressources humaines, le budget, les financements, le projet éducatif, etc."
+  },
+  {
+    "id": "84d2c9d6-354f-4f35-9f8b-87ea13109407",
+    "titre": "Le rôle de la commune ou de l’intercommunalité",
+    "categorie": "Partenaires",
+    "importance": "NORMAL",
+    "contenu": "La mairie ou l’intercommunalité peut également jouer un rôle très important.\n\nSelon les situations, elle peut :\n• fournir ou louer les locaux ;\n• verser une subvention ;\n• participer au financement des places ;\n• travailler avec la crèche sur les besoins du territoire ;\n• conclure une convention avec l’association."
+  },
+  {
+    "id": "84d2c9d6-354f-4f35-9f8b-87ea13109408",
+    "titre": "Belami : logiciel de gestion de crèche",
+    "categorie": "Outils",
+    "importance": "NORMAL",
+    "contenu": "Belami est un logiciel de gestion de crèche, utilisé notamment dans le réseau ACEPP.\n\nIl comporte des fonctions liées aux relations avec la CAF, notamment le calcul du taux de facturation."
+  }
+]

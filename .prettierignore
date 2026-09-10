@@ -1,0 +1,9 @@
+node_modules
+dist
+dist-server
+demo-data
+.local
+tmp
+playwright-report
+test-results
+package-lock.json

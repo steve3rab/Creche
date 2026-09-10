@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "filoustics-dev",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["scripts/dev-demo.mjs"],
+      "port": 4317,
+      "autoPort": true
+    },
+    {
+      "name": "filoustics-prod-preview",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["scripts/prod-preview.mjs"],
+      "port": 4317,
+      "autoPort": true
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+dist-server/
+.local/
+demo-data/
+test-results/
+playwright-report/
+tmp/
+*.log
+.claude/scheduled_tasks.lock

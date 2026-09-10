@@ -1,0 +1,12 @@
+import path from 'node:path';
+import fs from 'node:fs/promises';
+import { Storage, exists } from '../server/services/storage.js';
+import { seed } from './seed.js';
+const root = path.resolve('demo-data');
+if (!(await exists(root)) || !(await fs.readdir(root)).length) await seed(new Storage(root));
+process.env.APP_WORKSPACE = root;
+process.env.APP_CONFIG_DIR = path.resolve('.local/demo');
+process.env.PORT = '4318';
+process.argv.push('--dev');
+console.log('Démonstration fictive, séparée de votre répertoire réel.');
+await import('../server/index.js');
