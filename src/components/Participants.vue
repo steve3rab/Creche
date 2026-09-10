@@ -86,9 +86,9 @@ function add(e: Event, members: Member[]) {
       ><select
         v-if="attendance && p.etat === 'PROCURATION'"
         :value="p.mandataireId || ''"
-        @change="setProxy(p, $event)"
         aria-label="Mandataire"
         :disabled="disabled"
+        @change="setProxy(p, $event)"
       >
         <option value="">
           {{ p.mandataire && !p.mandataireId ? p.mandataire : 'Choisir un mandataire' }}

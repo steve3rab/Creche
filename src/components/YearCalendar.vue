@@ -18,7 +18,8 @@ const months = computed(() =>
           day: day.getDate(),
           current: day.getMonth() === monthIndex,
           hasEvent: dayEvents.length > 0,
-          categoryClass: dayEvents.map((event) => eventCategoryClass(event.categorie)).find(Boolean) || '',
+          categoryClass:
+            dayEvents.map((event) => eventCategoryClass(event.categorie)).find(Boolean) || '',
         };
       }),
     };

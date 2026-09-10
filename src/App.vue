@@ -15,30 +15,38 @@ import {
   Plus,
   NotebookPen,
   BookOpen,
+  ClipboardList,
+  ContactIcon,
+  BarChart3,
+  BellRing,
 } from 'lucide-vue-next';
-import { boot, state, toast, run, refresh } from './composables/app';
+import { boot, state, toast, run, refresh, meetingReminders } from './composables/app';
 import { api } from './services/api';
 import Modal from './components/Modal.vue';
 import ConfirmationDialog from './components/ConfirmationDialog.vue';
 import { confirmation } from './composables/confirmation';
 import MeetingForm from './components/MeetingForm.vue';
-import { meetingDisplayTitle, type Meeting } from './domain/models';
+import { meetingDisplayTitle, prettyDate, type Meeting } from './domain/models';
 const router = useRouter(),
   route = useRoute(),
   creating = ref(false),
   searching = ref(false),
   query = ref(''),
   directory = ref('C:\\CrecheParentale'),
-  association = ref('Les Filoustics');
+  association = ref('Les Filoustics'),
+  remindersDismissed = ref(false);
 const nav = [
   ['/', 'Accueil', Home],
   ['/reunions', 'Réunions', CalendarRange],
   ['/agenda', 'Agenda', CalendarDays],
+  ['/planning', 'Planning', ClipboardList],
   ['/documents', 'Documents', FolderOpen],
   ['/membres', 'Membres', Users],
+  ['/contacts', 'Contacts', ContactIcon],
   ['/actions', 'Actions', CheckSquare],
   ['/notes', 'Notes', NotebookPen],
   ['/glossaire', 'Glossaire', BookOpen],
+  ['/statistiques', 'Statistiques', BarChart3],
 ] as const;
 function isCurrentSpace(url: string) {
   return route.path === url || (url === '/reunions' && route.path.startsWith('/reunions/'));
@@ -141,6 +149,18 @@ const results = computed(() => {
       kind: 'Glossaire',
       url: '/glossaire?q=' + encodeURIComponent(x.cle),
     })),
+    ...state.planning.map((x) => ({
+      id: x.id,
+      title: `${x.membre || 'Créneau'} · ${prettyDate(x.date)}`,
+      kind: 'Planning',
+      url: '/planning?date=' + x.date,
+    })),
+    ...state.contacts.map((x) => ({
+      id: x.id,
+      title: x.nom,
+      kind: 'Contact',
+      url: '/contacts?q=' + encodeURIComponent(x.nom),
+    })),
   ]
     .filter((x) => x.title.toLocaleLowerCase('fr').includes(q))
     .slice(0, 30);
@@ -184,6 +204,23 @@ const results = computed(() => {
         <span>{{ state.error }}</span
         ><RouterLink to="/parametres">Sauvegardes</RouterLink
         ><button aria-label="Fermer l’erreur" @click="state.error = ''">×</button>
+      </div>
+      <div
+        v-if="!remindersDismissed && meetingReminders.length"
+        role="note"
+        class="error-banner reminder-banner"
+      >
+        <BellRing :size="15" />
+        <span
+          >{{
+            meetingReminders.length === 1
+              ? '1 réunion approche :'
+              : meetingReminders.length + ' réunions approchent :'
+          }}
+          <RouterLink v-for="m in meetingReminders" :key="m.id" :to="'/reunions/' + m.id"
+            >{{ meetingDisplayTitle(m) }} ({{ prettyDate(m.date) }})</RouterLink
+          ></span
+        ><button aria-label="Fermer le rappel" @click="remindersDismissed = true">×</button>
       </div>
       <main v-if="state.ready && state.configured"><RouterView :key="$route.path" /></main>
       <main v-else-if="state.ready" class="onboarding">

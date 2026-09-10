@@ -23,6 +23,7 @@ import { documentHtml, generatePdf, reopenMeeting, validateMeeting } from './ser
 import { validateBranding } from './services/pdf-branding.js';
 import { saveAction, saveNote } from './services/notes.js';
 import { saveGlossaryEntry } from './services/glossaire.js';
+import { streamBackupZip } from './services/zip.js';
 
 const pointerSchema = z.object({ schemaVersion: z.literal(1), workspace: z.string().min(1) });
 export async function createApp(options: { configDir: string; workspace?: string; port: number }) {
@@ -37,13 +38,19 @@ export async function createApp(options: { configDir: string; workspace?: string
   }
   // Host and Origin guards protect the unauthenticated loopback API from other websites.
   app.use((req, res, next) => {
-    if (req.headers.host !== `127.0.0.1:${options.port}`)
-      return res.status(403).json({ error: 'Hôte refusé' });
+    if (req.headers.host !== `127.0.0.1:${options.port}`) {
+      res.status(403).json({ error: 'Hôte refusé' });
+      return;
+    }
     const origin = req.headers.origin;
-    if (origin && origin !== `http://127.0.0.1:${options.port}`)
-      return res.status(403).json({ error: 'Origine refusée' });
-    if (req.headers['sec-fetch-site'] === 'cross-site')
-      return res.status(403).json({ error: 'Origine refusée' });
+    if (origin && origin !== `http://127.0.0.1:${options.port}`) {
+      res.status(403).json({ error: 'Origine refusée' });
+      return;
+    }
+    if (req.headers['sec-fetch-site'] === 'cross-site') {
+      res.status(403).json({ error: 'Origine refusée' });
+      return;
+    }
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
     if (!req.path.startsWith('/api/'))
@@ -161,7 +168,15 @@ export async function createApp(options: { configDir: string; workspace?: string
   const save: Partial<
     Record<Collection, (store: Storage, value: unknown, create?: boolean) => Promise<unknown>>
   > = { actions: saveAction, notes: saveNote, glossaire: saveGlossaryEntry };
-  for (const name of ['membres', 'agenda', 'actions', 'notes', 'glossaire'] as Collection[]) {
+  for (const name of [
+    'membres',
+    'agenda',
+    'actions',
+    'notes',
+    'glossaire',
+    'planning',
+    'contacts',
+  ] as Collection[]) {
     const saveFn = save[name] ?? ((store, value, create) => store.saveRecord(name, value, create));
     app.get(`/api/${name}`, async (_req, res) => res.json(await db().list(name)));
     app.post(`/api/${name}`, async (req, res) =>
@@ -250,6 +265,13 @@ export async function createApp(options: { configDir: string; workspace?: string
   app.post('/api/sauvegardes', async (_req, res) =>
     res.json(await db().serial(() => db().snapshot())),
   );
+  app.get('/api/sauvegardes/:id/export', async (req, res) => {
+    const backup = z
+      .string()
+      .regex(/^[\w-]+$/)
+      .parse(req.params.id);
+    await streamBackupZip(res, db(), backup, (await db().config()).association);
+  });
   app.post('/api/sauvegardes/:id/restaurer', async (req, res) => {
     confirmed(req.body);
     const backup = z

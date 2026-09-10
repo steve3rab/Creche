@@ -50,8 +50,12 @@ Choisir un répertoire **hors OneDrive, Dropbox ou autre dossier synchronisé**,
 - **Agenda** : dates de début et de fin, identiques par défaut. Une période (catégorie « Vacances » par exemple) apparaît chaque jour, début et fin inclus. Les événements en cours restent visibles sur l’accueil. Les liens vers une réunion et une action sont regroupés sur une même ligne. Les réunions et échéances d’actions apparaissent aussi automatiquement ; leur sélection ouvre leur fiche source.
 - **Documents** : import, ouverture, renommage, changement de catégorie, archivage et corbeille. Formats acceptés : PDF, TXT, PNG, JPG, JPEG, DOCX, XLSX, ODT et ODS, jusqu’à 20 Mo. Les PDF, images et textes s’ouvrent dans Edge ; les formats bureautiques sont proposés au téléchargement. L’application n’exécute jamais un fichier importé.
 - **Membres** : nom et prénom dans un seul champ, prénom de l’enfant facultatif, fonction et coordonnées utiles au secrétariat. Pas de dates d’entrée ou de sortie à renseigner.
-- **Recherche** : réunions, documents, membres, actions et dates importantes.
+- **Planning** : emploi du temps hebdomadaire des créneaux de garde, chacun associé à un membre responsable, avec heure de début et de fin. Navigation semaine par semaine ; un créneau s’ouvre en cliquant dessus pour être modifié ou supprimé (récupérable depuis la corbeille).
+- **Contacts** : répertoire des interlocuteurs extérieurs à l’association (CAF, PMI, mairie, assurance, fournisseurs…), avec structure, fonction et coordonnées. Distinct des Membres, qui reste réservé au bureau et aux adhérents.
+- **Recherche** : réunions, documents, membres, actions, dates importantes, créneaux de planning et contacts.
 - **Notes** : création, lecture et modification de notes avec catégorie libre et niveau Normal, Important ou Prioritaire. Recherche dans le titre et le contenu, filtres cumulables par catégorie et importance, tris par modification (récente ou ancienne), titre, importance et catégorie. Les notes apparaissent aussi dans la recherche globale et sont protégées par les sauvegardes et la corbeille.
+- **Statistiques** : indicateurs calculés à partir des données déjà présentes — réunions par statut et par type, taux de présence moyen sur les PV clôturés, actions en retard et taux de complétion, membres actifs par fonction, documents par catégorie, répartition des créneaux de garde par responsable, notes par importance.
+- **Rappel automatique avant une réunion** : un bandeau apparaît sur tous les écrans dès qu’une réunion à venir entre dans la fenêtre définie par **Paramètres → Rappel avant une réunion (jours)** (3 jours par défaut, réglable de 0 à 30). Le bandeau se ferme d’un clic pour la session en cours et réapparaît au prochain démarrage tant que la réunion approche. Aucune notification n’est envoyée en dehors de l’application : sans service en tâche de fond ni e-mail, ce rappel n’est visible que lorsque Filoustics est ouvert.
 
 Raccourcis : `Ctrl+N` nouvelle réunion, `Ctrl+S` enregistrer le formulaire ouvert, `Ctrl+K` rechercher, `Échap` fermer un dialogue.
 
@@ -82,6 +86,8 @@ C:\CrecheParentale\
 ├── notes.json
 ├── agenda.json
 ├── actions.json
+├── planning.json           # créneaux de garde
+├── contacts.json           # interlocuteurs extérieurs
 ├── documents.json          # index documentaire
 ├── reunions\
 │   └── 2026\
@@ -131,6 +137,10 @@ Par défaut, les **20 dernières sauvegardes** sont conservées. Le nombre est r
 
 Une suppression déplace les données vers `corbeille/` ; elle reste récupérable tant que cette corbeille, ou une sauvegarde la contenant, existe.
 
+### Sauvegarde hors-site (.zip)
+
+Les sauvegardes ci-dessus restent sur le même disque que les données ; une panne matérielle ou un vol de l’ordinateur les emporte avec le reste. Dans **Paramètres → Sauvegardes**, le bouton **Créer et télécharger une sauvegarde hors-site (.zip)** crée une sauvegarde puis propose immédiatement son téléchargement en une seule archive .zip, à enregistrer sur une clé USB ou un espace personnel en dehors de cet ordinateur. Chaque sauvegarde déjà existante peut aussi être téléchargée individuellement via le bouton **.zip** de sa ligne. Cette archive est une copie lisible, sans compte ni service distant : elle ne remplace pas une politique de sauvegarde régulière, mais permet d’en conserver une copie ailleurs.
+
 ## Restauration
 
 1. Ouvrir **Paramètres → Sauvegardes**.
@@ -165,10 +175,18 @@ src/styles/        design sombre
 server/app.ts      opérations REST métier
 server/services/  stockage, sauvegardes, corbeille, PDF
 scripts/           démonstration et vérification PDF
-tests/             métier, filesystem, composants et Edge
+tests/             métier, filesystem, serveur HTTP, composants et Edge
 ```
 
 L’état partagé utilise la réactivité Vue ; Pinia n’est pas nécessaire à cette application mono-utilisateur. Les imports `lucide-vue-next` utilisent un alias npm vers le paquet maintenu `@lucide/vue`, le nom historique ayant été déprécié par son éditeur. Les icônes restent locales et fournies par Lucide.
+
+### Qualité du code
+
+```powershell
+npm.cmd run lint
+```
+
+ESLint (configuration plate, `eslint.config.js`) avec `typescript-eslint` et `eslint-plugin-vue`, sans recoupement avec Prettier (`eslint-config-prettier`). Le typage TypeScript est strict (`strict: true`) et renforcé par `noImplicitReturns`, `noFallthroughCasesInSwitch` et `forceConsistentCasingInFileNames` ; `npm.cmd run build` fait échouer la compilation en cas d’erreur de typage.
 
 ## Démonstration
 
@@ -182,14 +200,17 @@ Ouvrir **http://127.0.0.1:4318** dans Edge. Le dossier séparé `demo-data/` con
 
 ```powershell
 npm.cmd test
+npm.cmd run test:coverage
 npm.cmd run test:e2e
 ```
 
 - **Vitest** : règles métier, validation, statuts, dates, noms, chemins, sérialisation et migrations.
 - **Filesystem réel** : dossiers temporaires nettoyés, écritures, sauvegardes, restaurations, corbeille, corruption, coupure simulée avant renommage et confinement des chemins.
+- **Serveur HTTP réel** : `createApp` démarré sur un port libre dans `tests/app.test.ts` — garde-fous Host/Origine, sauvegarde hors-site en .zip, routes Planning et Contacts, bornes du réglage de rappel — sans dépendre d’Edge.
 - **Vue Test Utils** : création de réunion, ordre du jour, participants, calendrier, actions, dialogue et validation.
-- **Playwright** : Microsoft Edge explicitement sélectionné avec `channel: 'msedge'`, fenêtre 879 × 645, dix scénarios de non-régression, sécurité et premier lancement compilé. Chaque test utilise son propre dossier temporaire ; les données réelles ne sont jamais chargées.
+- **Playwright** : Microsoft Edge explicitement sélectionné avec `channel: 'msedge'`, fenêtre 879 × 645, scénarios de non-régression (dont Planning, Contacts, Statistiques et le rappel automatique), sécurité et premier lancement compilé. Chaque test utilise son propre dossier temporaire ; les données réelles ne sont jamais chargées.
 - **Régression visuelle** : références de l’accueil, des réunions, de la fiche, de l’agenda, des documents et du PV, avec tolérance aux petites variations de rendu.
+- **Couverture** : `test:coverage` (V8) couvre les composants réutilisables, le domaine, les composables et le serveur — pas les écrans (`src/views`, `App.vue`), qui dépendent du routeur et sont couverts par Playwright à la place. Le rapport HTML se trouve dans `coverage/index.html`.
 
 `test:e2e` compile avant l’exécution. Le rapport HTML se trouve dans `playwright-report/index.html` ; traces et captures d’échecs dans `test-results/`. Réviser une modification visuelle avant de mettre à jour les références :
 

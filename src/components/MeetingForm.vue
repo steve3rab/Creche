@@ -16,7 +16,7 @@ function submit() {
 }
 </script>
 <template>
-  <form @submit.prevent="submit" class="form-grid">
+  <form class="form-grid" @submit.prevent="submit">
     <label class="full">Titre (facultatif)<input v-model="m.titre" maxlength="240" /></label
     ><MeetingTypes v-model:primary="m.type" v-model:secondary="m.typeSecondaire" /><label
       >Date<input v-model="m.date" type="date" required /></label

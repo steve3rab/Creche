@@ -2,7 +2,7 @@
 import { askConfirmation } from '../composables/confirmation';
 import { ref, onMounted, computed } from 'vue';
 import { cleanSignature, defaultSignatureHtml } from '../domain/branding';
-import { HardDrive, FolderOpen, ShieldCheck, RotateCcw } from 'lucide-vue-next';
+import { HardDrive, FolderOpen, ShieldCheck, RotateCcw, Download } from 'lucide-vue-next';
 import { state, run, refresh, boot } from '../composables/app';
 import { api } from '../services/api';
 import { configSchema, type Config } from '../domain/models';
@@ -63,6 +63,16 @@ async function backup() {
     backups.value = await api('/sauvegardes');
   }, 'Sauvegarde créée');
 }
+function exportUrl(id: string) {
+  return '/api/sauvegardes/' + id + '/export';
+}
+async function exportOffSite() {
+  await run(async () => {
+    const created = await api<{ id: string }>('/sauvegardes', 'POST');
+    backups.value = await api('/sauvegardes');
+    window.location.href = exportUrl(created.id);
+  }, 'Sauvegarde hors-site créée : enregistrez le fichier .zip sur une clé USB ou un espace personnel.');
+}
 async function restore(id: string) {
   if (
     !(await askConfirmation(
@@ -107,8 +117,18 @@ async function changeWorkspace() {
           type="number"
           min="2"
           max="100"
+          required /></label
+      ><label
+        >Rappel avant une réunion (jours)<input
+          v-model.number="config.rappelJours"
+          type="number"
+          min="0"
+          max="30"
           required
       /></label>
+      <small class="full muted"
+        >Un rappel apparaît en haut de l’écran dès qu’une réunion approche dans ce délai.</small
+      >
       <h2 class="full">Présentation des PDF</h2>
       <div class="full stack">
         <label
@@ -144,11 +164,14 @@ async function changeWorkspace() {
         >
           Remettre la signature par défaut
         </button>
+        <!-- signaturePreview is cleanSignature(...)-sanitized above, not raw input. -->
+        <!-- eslint-disable vue/no-v-html -->
         <div
           class="signature-preview"
           aria-label="Aperçu de la signature"
           v-html="signaturePreview"
         />
+        <!-- eslint-enable vue/no-v-html -->
         <small>Les changements s’appliquent aux prochains PDF générés.</small>
       </div>
       <footer class="full">
@@ -192,11 +215,23 @@ async function changeWorkspace() {
       <div class="backup-list">
         <div v-for="b in backups" :key="b.id" class="row backup-row">
           <code class="grow">{{ b.id.slice(0, 19).replace('T', ' à ') }}</code
+          ><a class="secondary" :href="exportUrl(b.id)" :download="'Filoustics_' + b.id + '.zip'"
+            ><Download :size="14" />.zip</a
           ><button class="secondary" :disabled="state.busy" @click="restore(b.id)">
             <RotateCcw :size="14" />Restaurer
           </button>
         </div>
         <p v-if="!backups.length" class="empty">Aucune sauvegarde disponible.</p>
+      </div>
+      <div class="stack offsite-export">
+        <p class="muted">
+          Une sauvegarde reste sur ce disque : en cas de panne ou de vol de l’ordinateur, elle est
+          perdue avec le reste. Téléchargez régulièrement une copie <strong>hors-site</strong>
+          (.zip) sur une clé USB ou un espace personnel, en dehors de cet ordinateur.
+        </p>
+        <button class="secondary fit" :disabled="state.busy" @click="exportOffSite">
+          <Download :size="15" />Créer et télécharger une sauvegarde hors-site (.zip)
+        </button>
       </div>
     </section>
   </div>

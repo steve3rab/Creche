@@ -14,7 +14,7 @@ for (const [index, member] of members.entries())
     ...member,
     prenomEnfant: ['Milo', 'Noa', 'Lina', 'Zoé', 'Iris'][index],
   });
-let m = await store.meeting(meetings[0].id);
+const m = await store.meeting(meetings[0].id);
 m.heureFin = '21:15';
 m.typeSecondaire = 'BUREAU';
 m.participants[2].etat = 'PROCURATION';

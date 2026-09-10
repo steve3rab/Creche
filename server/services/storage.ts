@@ -13,12 +13,11 @@ import {
   migrate,
   type Collection,
   type Config,
-  type Meeting,
 } from '../../src/domain/models.js';
 
 // Older workspaces and backups predate these collections; reads and backups treat a
 // missing file as empty rather than corrupt.
-const optionalCollections: Collection[] = ['notes', 'glossaire'];
+const optionalCollections: Collection[] = ['notes', 'glossaire', 'planning', 'contacts'];
 const backupFilePattern = new RegExp(
   `^(?:(?:config|${Object.keys(collectionSchemas).join('|')})\\.json$|reunions/|documents/|corbeille/)`,
 );
@@ -481,7 +480,9 @@ export class Storage {
                   ? item.nomComplet
                   : 'cle' in item
                     ? item.cle
-                    : id,
+                    : 'heureDebut' in item
+                      ? `${item.date} ${item.heureDebut}–${item.heureFin}`
+                      : id,
           date: new Date().toISOString(),
           kind: 'record',
           collection: name,
@@ -515,7 +516,16 @@ export class Storage {
       await fs.rename(await this.safe(`corbeille/${id}/contenu`), target);
     } else {
       const name = z
-          .enum(['membres', 'agenda', 'actions', 'documents', 'notes', 'glossaire'])
+          .enum([
+            'membres',
+            'agenda',
+            'actions',
+            'documents',
+            'notes',
+            'glossaire',
+            'planning',
+            'contacts',
+          ])
           .parse(meta.collection),
         item = collectionSchemas[name].parse(meta.record),
         rows = await this.list(name);

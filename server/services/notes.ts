@@ -1,10 +1,4 @@
-import {
-  actionSchema,
-  newBase,
-  today,
-  type Action,
-  type Note,
-} from '../../src/domain/models.js';
+import { actionSchema, newBase, today, type Action, type Note } from '../../src/domain/models.js';
 import type { Storage } from './storage.js';
 
 // A note marked "à affiner" needs an owner and a deadline, which notes don't have —
@@ -37,8 +31,7 @@ export async function saveAction(store: Storage, value: unknown, create = false)
   const action = (await store.saveRecord('actions', value, create)) as Action;
   if (action.noteSource && (action.statut === 'TERMINE' || action.statut === 'ANNULE')) {
     const note = (await store.list('notes')).find((n) => n.id === action.noteSource) as
-      | Note
-      | undefined;
+      Note | undefined;
     if (note && note.importance === 'AFFINER' && note.actionId === action.id)
       await store.saveRecord('notes', { ...note, importance: 'NORMAL', actionId: '' });
   }

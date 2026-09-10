@@ -1,5 +1,6 @@
-import { reactive, ref } from 'vue';
+import { reactive, ref, computed } from 'vue';
 import { api } from '../services/api';
+import { sortMeetings, dayDelta } from '../domain/models';
 import type {
   Meeting,
   Member,
@@ -9,6 +10,8 @@ import type {
   Config,
   Note,
   GlossaryEntry,
+  Shift,
+  Contact,
 } from '../domain/models';
 export const state = reactive({
   meetings: [] as Meeting[],
@@ -18,12 +21,26 @@ export const state = reactive({
   documents: [] as Document[],
   notes: [] as Note[],
   glossaire: [] as GlossaryEntry[],
+  planning: [] as Shift[],
+  contacts: [] as Contact[],
   config: null as Config | null,
   workspace: '',
   configured: false,
   ready: false,
   error: '',
   busy: false,
+});
+// Meetings due within config.rappelJours days — the automatic reminder window shown
+// on every screen, recomputed as soon as the date or the setting changes.
+export const meetingReminders = computed(() => {
+  const days = state.config?.rappelJours ?? 3;
+  return sortMeetings(
+    state.meetings.filter((m) => {
+      if (m.archive || m.statut === 'CLOTUREE') return false;
+      const delta = dayDelta(m.date);
+      return delta >= 0 && delta <= days;
+    }),
+  );
 });
 export const toast = ref('');
 let timer: ReturnType<typeof setTimeout>;
@@ -60,9 +77,11 @@ export async function refresh() {
     api<Config>('/config'),
     api<Note[]>('/notes'),
     api<GlossaryEntry[]>('/glossaire'),
+    api<Shift[]>('/planning'),
+    api<Contact[]>('/contacts'),
   ]);
   if (sequence !== refreshSequence) return;
-  const [m, mb, a, e, d, c, n, g] = results;
+  const [m, mb, a, e, d, c, n, g, p, ct] = results;
   if (m.status === 'fulfilled') state.meetings = m.value;
   if (mb.status === 'fulfilled') state.members = mb.value;
   if (a.status === 'fulfilled') state.actions = a.value;
@@ -71,6 +90,8 @@ export async function refresh() {
   if (c.status === 'fulfilled') state.config = c.value;
   if (n.status === 'fulfilled') state.notes = n.value;
   if (g.status === 'fulfilled') state.glossaire = g.value;
+  if (p.status === 'fulfilled') state.planning = p.value;
+  if (ct.status === 'fulfilled') state.contacts = ct.value;
   const failed = results.find((r) => r.status === 'rejected');
   if (failed?.status === 'rejected') throw failed.reason;
 }
@@ -86,6 +107,8 @@ export async function boot() {
       state.documents = [];
       state.notes = [];
       state.glossaire = [];
+      state.planning = [];
+      state.contacts = [];
       state.config = null;
     }
     state.configured = s.configured;

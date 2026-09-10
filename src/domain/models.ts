@@ -256,6 +256,32 @@ export const glossaryEntrySchema = z.object({
   description: text.default(''),
 });
 export type GlossaryEntry = z.infer<typeof glossaryEntrySchema>;
+export const shiftSchema = z
+  .object({
+    ...base,
+    date: dateSchema,
+    heureDebut: time,
+    heureFin: time,
+    membreId: idSchema,
+    membre: short.default(''),
+    notes: text.default(''),
+  })
+  .refine((s) => s.heureFin > s.heureDebut, {
+    message: 'L’heure de fin doit être après l’heure de début.',
+    path: ['heureFin'],
+  });
+export type Shift = z.infer<typeof shiftSchema>;
+export const contactSchema = z.object({
+  ...base,
+  nom: short.min(1, 'Le nom est obligatoire.'),
+  structure: short.default(''),
+  fonction: short.default(''),
+  telephone: short.default(''),
+  email: z.union([z.string().email(), z.literal('')]).default(''),
+  adresse: text.default(''),
+  notes: text.default(''),
+});
+export type Contact = z.infer<typeof contactSchema>;
 export const configSchema = z.object({
   schemaVersion: z.literal(1),
   association: short.min(1),
@@ -273,6 +299,7 @@ export const configSchema = z.object({
     .default('')
     .refine(isLogoDataUrl, 'Choisissez un logo PNG ou JPEG valide de moins de 1 Mo.'),
   retention: z.number().int().min(2).max(100).default(20),
+  rappelJours: z.number().int().min(0).max(30).default(3),
 });
 export const collectionSchemas = {
   membres: memberSchema,
@@ -281,6 +308,8 @@ export const collectionSchemas = {
   documents: documentSchema,
   notes: noteSchema,
   glossaire: glossaryEntrySchema,
+  planning: shiftSchema,
+  contacts: contactSchema,
 };
 export const envelope = <T extends z.ZodTypeAny>(item: T) =>
   z.object({ schemaVersion: z.literal(1), items: z.array(item) });
