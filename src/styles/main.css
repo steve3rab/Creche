@@ -31,6 +31,8 @@
   --blue-bg: #2a3f56;
   --violet: #cdb3f0;
   --violet-bg: #3a2f52;
+  --danger-contrast: #ffe1dc;
+  --next-meeting-accent: #26405c;
   --radius-sm: 7px;
   --radius: 11px;
   --radius-lg: 16px;
@@ -38,6 +40,41 @@
   --shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
   --shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.5);
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+:root[data-theme='light'] {
+  --bg: #f5f6f8;
+  --bg-sidebar: #eef0f3;
+  --bg-panel: #ffffff;
+  --bg-panel-strong: #eef1f5;
+  --bg-panel-hover: #e5e9ee;
+  --bg-input: #ffffff;
+  --border: #d8dde3;
+  --border-soft: #e4e8ec;
+  --border-strong: #b7c0cb;
+  --text: #1c222b;
+  --text-muted: #5b6675;
+  --text-dim: #79899c;
+  --accent: #278350;
+  --accent-hover: #1f6b41;
+  --accent-strong: #195c37;
+  --accent-contrast: #ffffff;
+  --accent-soft: #e1f2e8;
+  --danger: #a8321c;
+  --danger-bg: #fbe3de;
+  --warning: #7a5b12;
+  --warning-bg: #fbefd6;
+  --warning-border: #d9bd74;
+  --mauve: #8a3f92;
+  --mauve-bg: #f7e9f9;
+  --blue: #235f8b;
+  --blue-bg: #e3eef9;
+  --violet: #5a3fa0;
+  --violet-bg: #ece5fb;
+  --danger-contrast: #6e1c0d;
+  --next-meeting-accent: #cfe3f5;
+  --shadow-sm: 0 1px 3px rgba(28, 34, 43, 0.1);
+  --shadow: 0 10px 28px rgba(28, 34, 43, 0.14);
+  --shadow-lg: 0 24px 70px rgba(28, 34, 43, 0.22);
 }
 * {
   box-sizing: border-box;
@@ -56,6 +93,9 @@ body {
   font-size: 13px;
   line-height: 1.45;
   color-scheme: dark;
+}
+:root[data-theme='light'] body {
+  color-scheme: light;
 }
 button,
 input,
@@ -281,6 +321,25 @@ svg {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  padding: 7px;
+}
+.theme-toggle:hover {
+  background: var(--bg-panel-hover);
+  color: var(--text);
+}
 .search-trigger {
   display: flex;
   align-items: center;
@@ -397,7 +456,7 @@ main::-webkit-scrollbar-thumb,
   color: var(--accent);
 }
 .next-meeting {
-  background: linear-gradient(135deg, var(--bg-panel-strong), #26405c);
+  background: linear-gradient(135deg, var(--bg-panel-strong), var(--next-meeting-accent));
   border-color: var(--border-strong) !important;
 }
 .next-meeting h3 {
@@ -981,7 +1040,7 @@ footer {
   align-items: center;
   gap: 9px;
   background: var(--danger-bg);
-  color: #ffe1dc;
+  color: var(--danger-contrast);
   padding: 10px 20px;
   font-size: 11px;
   z-index: 30;

@@ -63,6 +63,12 @@ describe('Notes : validation, filtres et tri', () => {
       'Zèbre',
     ]);
   });
+  it('en tri « pertinence », trouve une note même si elle ne contient qu’un des mots de la requête', () => {
+    expect(
+      selectNotes(notes, 'budget enfants', '', '', 'pertinence').map((n) => n.titre).sort(),
+    ).toEqual(['Budget', 'Zèbre']);
+    expect(selectNotes(notes, 'budget enfants', '', '', 'titre')).toEqual([]);
+  });
   it('refuse les champs vides et les niveaux inconnus', () => {
     for (const patch of [
       { titre: ' ' },

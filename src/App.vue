@@ -19,8 +19,11 @@ import {
   ContactIcon,
   BarChart3,
   BellRing,
+  Sun,
+  Moon,
 } from 'lucide-vue-next';
 import { boot, state, toast, run, refresh, meetingReminders } from './composables/app';
+import { theme, toggleTheme } from './composables/theme';
 import { api } from './services/api';
 import Modal from './components/Modal.vue';
 import ConfirmationDialog from './components/ConfirmationDialog.vue';
@@ -196,9 +199,18 @@ const results = computed(() => {
           <span class="association">{{ state.config?.association || 'Votre association' }}</span>
           <span v-if="spaceTitle" class="space-name">{{ spaceTitle }}</span>
         </div>
-        <button class="search-trigger" @click="searching = true">
-          <Search :size="15" /><span>Rechercher</span><kbd>Ctrl K</kbd>
-        </button>
+        <div class="topbar-actions">
+          <button
+            class="theme-toggle"
+            :aria-label="theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'"
+            @click="toggleTheme()"
+          >
+            <Sun v-if="theme === 'dark'" :size="15" /><Moon v-else :size="15" />
+          </button>
+          <button class="search-trigger" @click="searching = true">
+            <Search :size="15" /><span>Rechercher</span><kbd>Ctrl K</kbd>
+          </button>
+        </div>
       </header>
       <div v-if="state.error" role="alert" class="error-banner">
         <span>{{ state.error }}</span

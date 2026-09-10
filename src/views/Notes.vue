@@ -149,6 +149,7 @@ onBeforeRouteLeave(
         <option value="titre">Titre : A à Z</option>
         <option value="importance">Importance : décroissante</option>
         <option value="categorie">Catégorie : A à Z</option>
+        <option value="pertinence">Pertinence (recherche)</option>
       </select></label
     >
   </div>
