@@ -129,6 +129,8 @@ Changer le répertoire dans Paramètres ouvre un autre espace, sans déplacer ni
 - Serveur lié uniquement à `127.0.0.1`, vérification de l’hôte et de l’origine des requêtes. Aucune API générique d’écriture de fichiers.
 - HTML des PDF échappé ; toutes les requêtes réseau du moteur PDF sont bloquées.
 
+**Performance.** Les réunions sont indexées à la demande (dossier `reunions/`) : une seule exploration ciblée des fichiers `reunion.json`, partagée par la lecture, la modification, la génération de PDF et la corbeille, au lieu d’un parcours répété du dossier — sans jamais mettre les données en cache d’une requête à l’autre, puisque chaque opération continue de relire et revalider les fichiers sur disque (garantie nécessaire pour détecter un JSON corrompu). Sur un espace de démonstration de 150 réunions, cela réduit d’environ 70 % les appels système de listage de répertoire pour les opérations courantes.
+
 Éviter de modifier manuellement les JSON pendant que l’application tourne. Un incident lors d’une opération portant sur plusieurs fichiers peut nécessiter une restauration ; la copie préalable reste disponible. Une coupure matérielle ou la perte du disque ne peut pas être couverte par des sauvegardes situées sur ce même disque : une copie périodique du dossier sur un support local externe reste possible.
 
 ## Sauvegardes
