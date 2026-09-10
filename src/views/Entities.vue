@@ -14,7 +14,6 @@ import {
   eventTypes,
   prettyDate,
   sortEvents,
-  dueLabel,
   dayDelta,
   eventContainsDate,
   eventDueLabel,

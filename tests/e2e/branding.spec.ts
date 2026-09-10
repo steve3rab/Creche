@@ -91,11 +91,15 @@ test('confirmations intégrées : annulation, Échap et reprise du brouillon', a
   await expect(page).toHaveScreenshot('confirmation.png');
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByLabel('Titre (facultatif)', { exact: true })).toHaveValue('Réunion modifiée');
+  await expect(page.getByLabel('Titre (facultatif)', { exact: true })).toHaveValue(
+    'Réunion modifiée',
+  );
   await page.reload();
   await expect(dialog).toContainText('brouillon');
   await dialog.getByRole('button', { name: 'Confirmer', exact: true }).click();
-  await expect(page.getByLabel('Titre (facultatif)', { exact: true })).toHaveValue('Réunion modifiée');
+  await expect(page.getByLabel('Titre (facultatif)', { exact: true })).toHaveValue(
+    'Réunion modifiée',
+  );
   await page.getByRole('button', { name: 'Enregistrer', exact: true }).click();
   await expect(page.getByRole('status')).toHaveText('Enregistré');
   await page.reload();

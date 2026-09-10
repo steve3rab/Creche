@@ -5,6 +5,7 @@ dist-server/
 demo-data/
 test-results/
 playwright-report/
+coverage/
 tmp/
 *.log
 .claude/scheduled_tasks.lock

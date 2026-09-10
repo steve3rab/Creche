@@ -14,6 +14,9 @@ import {
   memberSchema,
   noteSchema,
   glossaryEntrySchema,
+  shiftSchema,
+  contactSchema,
+  type Shift,
 } from '../src/domain/models';
 let dir: string, s: Storage;
 beforeEach(async () => {
@@ -269,7 +272,12 @@ describe('Stockage réel dans un répertoire temporaire', () => {
   it('étiquette une entrée de glossaire supprimée avec sa clé, pas son identifiant', async () => {
     const entry = await saveGlossaryEntry(
       s,
-      glossaryEntrySchema.parse({ ...newBase(), cle: 'pmi', valeur: 'Protection', description: '' }),
+      glossaryEntrySchema.parse({
+        ...newBase(),
+        cle: 'pmi',
+        valeur: 'Protection',
+        description: '',
+      }),
       true,
     );
     await s.deleteRecord('glossaire', entry.id);
@@ -287,5 +295,60 @@ describe('Stockage réel dans un répertoire temporaire', () => {
       await fs.rm(path.join(dir, 'link'));
       await fs.rm(external, { recursive: true });
     }
+  });
+  it('ouvre un ancien dossier sans planning ni contacts et les traite comme vides', async () => {
+    await fs.rm(await s.safe('planning.json'));
+    await fs.rm(await s.safe('contacts.json'));
+    expect(await s.list('planning')).toEqual([]);
+    expect(await s.list('contacts')).toEqual([]);
+    await s.verify();
+    const legacySnapshot = await s.snapshot();
+    const shift = shiftSchema.parse({
+      ...newBase(),
+      date: '2026-09-15',
+      heureDebut: '08:00',
+      heureFin: '12:00',
+      membreId: crypto.randomUUID(),
+      membre: 'Léa Martin',
+    });
+    await s.saveRecord('planning', shift, true);
+    expect(await s.list('planning')).toHaveLength(1);
+    await s.restore(legacySnapshot.id);
+    expect(await s.list('planning')).toEqual([]);
+  });
+  it('crée, modifie et étiquette dans la corbeille un créneau de garde par sa date et son heure', async () => {
+    const shift = (await s.saveRecord(
+      'planning',
+      shiftSchema.parse({
+        ...newBase(),
+        date: '2026-09-15',
+        heureDebut: '08:00',
+        heureFin: '12:00',
+        membreId: crypto.randomUUID(),
+        membre: 'Léa Martin',
+      }),
+      true,
+    )) as Shift;
+    const updated = (await s.saveRecord('planning', { ...shift, heureFin: '13:00' })) as Shift;
+    expect(updated.heureFin).toBe('13:00');
+    await s.deleteRecord('planning', shift.id);
+    const [trash] = await s.trash();
+    expect(trash.label).toBe('2026-09-15 08:00–13:00');
+    await s.restoreTrash(trash.id);
+    expect(await s.list('planning')).toMatchObject([{ heureFin: '13:00' }]);
+  });
+  it('crée, recherche et supprime un contact de façon récupérable', async () => {
+    const contact = await s.saveRecord(
+      'contacts',
+      contactSchema.parse({ ...newBase(), nom: 'CAF de Paris', structure: 'CAF' }),
+      true,
+    );
+    expect(await s.list('contacts')).toHaveLength(1);
+    await s.deleteRecord('contacts', contact.id);
+    expect(await s.list('contacts')).toEqual([]);
+    const [trash] = await s.trash();
+    expect(trash.label).toBe('CAF de Paris');
+    await s.restoreTrash(trash.id);
+    expect(await s.list('contacts')).toMatchObject([{ nom: 'CAF de Paris' }]);
   });
 });

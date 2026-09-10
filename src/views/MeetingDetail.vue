@@ -1,15 +1,14 @@
 <script setup lang="ts">
 import { askConfirmation } from '../composables/confirmation';
-import { ref, onMounted, onBeforeUnmount, computed, toRaw, watch } from 'vue';
+import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue';
 import { useRoute, onBeforeRouteLeave } from 'vue-router';
 import { ArrowLeft, Save, FileText, LockKeyhole } from 'lucide-vue-next';
 import { api } from '../services/api';
-import { state, run, refresh, notify } from '../composables/app';
+import { state, run, refresh } from '../composables/app';
 import {
   labels,
   meetingDisplayTitle,
   meetingStatuses,
-  meetingTypes,
   meetingSchema,
   newBase,
   actionSchema,
@@ -382,15 +381,15 @@ function glossaryTransform(text: string, cursor: number) {
           >Intitulé du point ajouté<input v-model="p.titre" :disabled="locked" maxlength="240"
         /></label>
         <RichTextarea
-          label="Résumé des échanges"
           v-model="p.discussion"
+          label="Résumé des échanges"
           :disabled="locked"
           :rows="3"
           :transform="glossaryTransform"
         />
         <RichTextarea
-          label="Décision"
           v-model="p.decision"
+          label="Décision"
           :disabled="locked"
           :rows="2"
           :transform="glossaryTransform"
@@ -407,27 +406,27 @@ function glossaryTransform(text: string, cursor: number) {
           <label
             >Pour<input
               :value="p.vote.pour"
-              @input="setVote(p, 'pour', $event)"
               type="number"
               min="0"
               :max="voteMax(p, 'pour')"
-              :disabled="locked" /></label
+              :disabled="locked"
+              @input="setVote(p, 'pour', $event)" /></label
           ><label
             >Contre<input
               :value="p.vote.contre"
-              @input="setVote(p, 'contre', $event)"
               type="number"
               min="0"
               :max="voteMax(p, 'contre')"
-              :disabled="locked" /></label
+              :disabled="locked"
+              @input="setVote(p, 'contre', $event)" /></label
           ><label
             >Abstention<input
               :value="p.vote.abstention"
-              @input="setVote(p, 'abstention', $event)"
               type="number"
               min="0"
               :max="voteMax(p, 'abstention')"
               :disabled="locked"
+              @input="setVote(p, 'abstention', $event)"
           /></label>
         </div>
         <button

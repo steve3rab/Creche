@@ -26,6 +26,9 @@ const router = createRouter({
     { path: '/parametres', component: () => import('./views/Settings.vue') },
     { path: '/notes', component: () => import('./views/Notes.vue') },
     { path: '/glossaire', component: () => import('./views/Glossaire.vue') },
+    { path: '/planning', component: () => import('./views/Planning.vue') },
+    { path: '/contacts', component: () => import('./views/Contacts.vue') },
+    { path: '/statistiques', component: () => import('./views/Kpi.vue') },
   ],
 });
 createApp(App).use(router).mount('#app');

@@ -153,7 +153,7 @@ test('6 · importer, déplacer, renommer, supprimer et restaurer un document', a
     (await workspace.store.list('documents')).some((d) => 'nom' in d && d.nom === 'Convention.txt'),
   ).toBe(true);
 });
-test('7 · événement visible dans mois, liste et accueil', async ({ page, workspace }) => {
+test('7 · événement visible dans mois, liste et accueil', async ({ page }) => {
   await page.getByRole('link', { name: 'Agenda', exact: true }).click();
   await page.getByRole('button', { name: 'Date importante', exact: true }).click();
   await page.getByLabel('Titre', { exact: true }).fill('Rendez-vous mairie');

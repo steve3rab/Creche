@@ -18,6 +18,8 @@ import {
   meetingTypeLabel,
   eventContainsDate,
   eventCategoryClass,
+  shiftSchema,
+  contactSchema,
 } from '../src/domain/models';
 import { resolveInside } from '../server/services/storage';
 import { documentHtml } from '../server/services/pdf';
@@ -169,5 +171,43 @@ describe('Modèle métier', () => {
     expect(html).not.toContain('<script>');
     expect(html).not.toContain('SECRET INTERNE');
     expect(html).toContain('A4');
+  });
+});
+describe('Planning, contacts et rappels', () => {
+  it('valide un créneau de garde et refuse une heure de fin antérieure ou égale au début', () => {
+    const base = {
+      ...newBase(),
+      date: '2026-09-15',
+      heureDebut: '08:00',
+      membreId: crypto.randomUUID(),
+      membre: 'Léa Martin',
+    };
+    expect(shiftSchema.safeParse({ ...base, heureFin: '12:00' }).success).toBe(true);
+    expect(shiftSchema.safeParse({ ...base, heureFin: '08:00' }).success).toBe(false);
+    expect(shiftSchema.safeParse({ ...base, heureFin: '07:00' }).success).toBe(false);
+  });
+  it('exige un nom pour un contact mais accepte des coordonnées vides', () => {
+    const contact = contactSchema.parse({ ...newBase(), nom: 'CAF de Paris' });
+    expect(contact.structure).toBe('');
+    expect(contact.email).toBe('');
+    expect(contactSchema.safeParse({ ...newBase(), nom: '' }).success).toBe(false);
+  });
+  it('rejette un e-mail de contact mal formé', () => {
+    expect(
+      contactSchema.safeParse({ ...newBase(), nom: 'Assurance', email: 'pas-un-email' }).success,
+    ).toBe(false);
+  });
+  it('applique un rappel par défaut de 3 jours et borne le réglage entre 0 et 30', () => {
+    const config = configSchema.parse({ schemaVersion: 1, association: 'Test' });
+    expect(config.rappelJours).toBe(3);
+    expect(
+      configSchema.safeParse({ schemaVersion: 1, association: 'Test', rappelJours: 31 }).success,
+    ).toBe(false);
+    expect(
+      configSchema.safeParse({ schemaVersion: 1, association: 'Test', rappelJours: -1 }).success,
+    ).toBe(false);
+    expect(
+      configSchema.parse({ schemaVersion: 1, association: 'Test', rappelJours: 0 }).rappelJours,
+    ).toBe(0);
   });
 });
