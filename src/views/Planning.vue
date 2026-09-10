@@ -9,7 +9,6 @@ import {
   newBase,
   today,
   dateSchema,
-  prettyDate,
   shiftSchema,
   shiftTemplateSchema,
   shiftPatchSchema,
@@ -21,58 +20,45 @@ const route = useRoute();
 function dateValue(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
-function addDays(date: string, n: number) {
-  const d = new Date(date + 'T12:00:00');
-  d.setDate(d.getDate() + n);
-  return dateValue(d);
-}
 function addYears(date: string, n: number) {
   const d = new Date(date + 'T12:00:00');
   d.setFullYear(d.getFullYear() + n);
   return dateValue(d);
 }
-function mondayOf(date: string) {
-  const d = new Date(date + 'T12:00:00');
-  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-  return dateValue(d);
-}
+const weekdayLabels = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 const requestedDate = dateSchema.safeParse(route.query.date);
-const weekStart = ref(mondayOf(requestedDate.success ? requestedDate.data : today()));
-function changeWeek(delta: number) {
-  weekStart.value = addDays(weekStart.value, delta * 7);
+const monthValue = ref((requestedDate.success ? requestedDate.data : today()).slice(0, 7));
+function changeMonth(delta: number) {
+  const [y, m] = monthValue.value.split('-').map(Number),
+    d = new Date(y, m - 1 + delta, 1);
+  monthValue.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 function goToday() {
-  weekStart.value = mondayOf(today());
+  monthValue.value = today().slice(0, 7);
 }
-const dayLabels = ['Lun.', 'Mar.', 'Mer.', 'Jeu.', 'Ven.', 'Sam.', 'Dim.'];
-function shortDate(date: string) {
-  return new Date(date + 'T12:00:00').toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'short',
-  });
-}
-const days = computed(() =>
-  dayLabels.map((label, i) => {
-    const date = addDays(weekStart.value, i);
-    return {
-      date,
-      label,
-      dateLabel: shortDate(date),
-      shifts: state.planning
-        .filter((s) => s.date === date)
-        .sort((a, b) => a.heureDebut.localeCompare(b.heureDebut)),
-    };
-  }),
-);
-const weekLabel = computed(
-  () => `${prettyDate(weekStart.value)} → ${prettyDate(addDays(weekStart.value, 6))}`,
-);
 const monthLabel = computed(() =>
-  new Date(weekStart.value + 'T12:00:00').toLocaleDateString('fr-FR', {
+  new Date(monthValue.value + '-01T12:00:00').toLocaleDateString('fr-FR', {
     month: 'long',
     year: 'numeric',
   }),
 );
+const monthDays = computed(() => {
+  const [y, m] = monthValue.value.split('-').map(Number),
+    first = new Date(y, m - 1, 1),
+    offset = (first.getDay() + 6) % 7;
+  return Array.from({ length: 42 }, (_, i) => {
+    const d = new Date(y, m - 1, 1 - offset + i),
+      date = dateValue(d);
+    return {
+      date,
+      dayNumber: d.getDate(),
+      current: d.getMonth() === m - 1,
+      shifts: state.planning
+        .filter((s) => s.date === date)
+        .sort((a, b) => a.heureDebut.localeCompare(b.heureDebut)),
+    };
+  });
+});
 // Two parents of the same child both show up as the shift's "responsable"; displaying
 // the child's name instead — the same substitution the PDFs already make — means both
 // parents' shifts read as referring to the one child, not two different people.
@@ -233,55 +219,59 @@ async function remove() {
       <Plus :size="16" />Créneau
     </button>
   </div>
-  <p class="muted planning-month">{{ monthLabel }}</p>
   <div class="month-toolbar">
     <button
-      aria-label="Semaine précédente"
-      title="Semaine précédente"
+      aria-label="Mois précédent"
+      title="Mois précédent"
       class="icon-button"
-      @click="changeWeek(-1)"
+      @click="changeMonth(-1)"
     >
       <ChevronLeft :size="18" />
     </button>
-    <h2>{{ weekLabel }}</h2>
+    <h2>{{ monthLabel }}</h2>
     <button
-      aria-label="Semaine suivante"
-      title="Semaine suivante"
+      aria-label="Mois suivant"
+      title="Mois suivant"
       class="icon-button"
-      @click="changeWeek(1)"
+      @click="changeMonth(1)"
     >
       <ChevronRight :size="18" /></button
     ><button class="quiet-link push-right" @click="goToday">Aujourd’hui</button>
   </div>
-  <div class="week-grid">
+  <div class="calendar planning-calendar">
+    <div v-for="d in weekdayLabels" :key="d" class="weekday">{{ d }}</div>
     <div
-      v-for="day in days"
+      v-for="day in monthDays"
       :key="day.date"
-      class="week-day"
-      :class="{ 'is-today': day.date === today() }"
+      class="day"
+      :data-date="day.date"
+      :class="{ outside: !day.current, 'is-today': day.date === today() }"
     >
-      <header class="week-day-header">
-        <strong>{{ day.label }}</strong
-        ><span class="muted">{{ day.dateLabel }}</span>
-      </header>
+      <div class="planning-day-head">
+        <span>{{ day.dayNumber }}</span
+        ><button
+          class="planning-day-add"
+          aria-label="Ajouter un créneau"
+          title="Ajouter un créneau"
+          @click="create(day.date)"
+        >
+          <Plus :size="10" />
+        </button>
+      </div>
       <button
         v-for="shift in day.shifts"
         :key="shift.id"
-        class="shift-card"
+        class="shift-pill"
         :class="{
           'shift-present': shift.statut === 'PRESENT',
           'shift-absent': shift.statut === 'ABSENT',
         }"
+        :title="`${shift.heureDebut}–${shift.heureFin} · ${shiftChildName(shift)}`"
         @click="edit(shift)"
       >
-        <span class="shift-time"
-          ><RepeatIcon v-if="shift.serieId" :size="10" />{{ shift.heureDebut }}–{{
-            shift.heureFin
-          }}</span
-        >
-        <span class="shift-member">{{ shiftChildName(shift) }}</span>
+        <RepeatIcon v-if="shift.serieId" :size="8" />{{ shift.heureDebut }} ·
+        {{ shiftChildName(shift) }}
       </button>
-      <button class="shift-add" @click="create(day.date)"><Plus :size="12" />Ajouter</button>
     </div>
   </div>
   <p v-if="!state.planning.length" class="panel empty large">

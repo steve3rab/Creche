@@ -13,16 +13,17 @@ test('planning : création, modification et suppression récupérable d’un cr�
   await dialog.getByRole('button', { name: 'Enregistrer', exact: true }).click();
   await expect(page.getByRole('status')).toHaveText('Créneau enregistré');
   await expect(page.getByText('Léa Martin')).toBeVisible();
-  await expect(page.getByText('08:00–12:00')).toBeVisible();
+  const pill = page.locator('.shift-pill');
+  await expect(pill).toHaveAttribute('title', '08:00–12:00 · Léa Martin');
 
-  await page.getByText('08:00–12:00').click();
+  await pill.click();
   dialog = page.getByRole('dialog', { name: 'Modifier le créneau' });
   await dialog.getByLabel('Heure de fin', { exact: true }).fill('13:00');
   await dialog.getByRole('button', { name: 'Enregistrer', exact: true }).click();
   await expect(page.getByRole('status')).toHaveText('Créneau enregistré');
-  await expect(page.getByText('08:00–13:00')).toBeVisible();
+  await expect(pill).toHaveAttribute('title', '08:00–13:00 · Léa Martin');
 
-  await page.getByText('08:00–13:00').click();
+  await pill.click();
   dialog = page.getByRole('dialog', { name: 'Modifier le créneau' });
   await dialog.getByRole('button', { name: 'Supprimer', exact: true }).click();
   const confirm = page.getByRole('dialog', { name: 'Confirmer l’action' });
@@ -45,13 +46,14 @@ test('planning : série hebdomadaire — création, modification et suppression 
   await dialog.getByLabel('Jusqu’au', { exact: true }).fill('2026-09-28');
   await dialog.getByRole('button', { name: 'Enregistrer', exact: true }).click();
   await expect(page.getByRole('status')).toHaveText('Créneaux enregistrés pour toute la période');
-  await expect(page.getByText('08:00–12:00')).toBeVisible();
   expect(await workspace.store.list('planning')).toHaveLength(4);
 
-  await page.getByRole('button', { name: 'Semaine suivante' }).click();
-  await expect(page.getByText('08:00–12:00')).toBeVisible();
+  const first = page.locator('.day[data-date="2026-09-07"] .shift-pill');
+  const second = page.locator('.day[data-date="2026-09-14"] .shift-pill');
+  await expect(first).toHaveAttribute('title', '08:00–12:00 · Léa Martin');
+  await expect(second).toHaveAttribute('title', '08:00–12:00 · Léa Martin');
 
-  await page.getByText('08:00–12:00').click();
+  await second.click();
   const editDialog = page.getByRole('dialog', { name: 'Modifier le créneau' });
   await expect(editDialog.getByText('répétition hebdomadaire')).toBeVisible();
   await editDialog
@@ -60,13 +62,10 @@ test('planning : série hebdomadaire — création, modification et suppression 
   await editDialog.getByLabel('Heure de début', { exact: true }).fill('09:00');
   await editDialog.getByRole('button', { name: 'Enregistrer', exact: true }).click();
   await expect(page.getByRole('status')).toHaveText('Créneaux mis à jour à partir de cette date');
-  await expect(page.getByText('09:00–12:00')).toBeVisible();
+  await expect(second).toHaveAttribute('title', '09:00–12:00 · Léa Martin');
+  await expect(first).toHaveAttribute('title', '08:00–12:00 · Léa Martin');
 
-  await page.getByRole('button', { name: 'Semaine précédente' }).click();
-  await expect(page.getByText('08:00–12:00')).toBeVisible();
-
-  await page.getByRole('button', { name: 'Semaine suivante' }).click();
-  await page.getByText('09:00–12:00').click();
+  await second.click();
   const deleteDialog = page.getByRole('dialog', { name: 'Modifier le créneau' });
   await deleteDialog
     .getByLabel('Appliquer les changements à', { exact: true })
@@ -88,7 +87,7 @@ test('planning : affiche le mois en cours et le prénom de l’enfant plutôt qu
   await workspace.store.saveRecord('membres', { ...leaMartin, prenomEnfant: 'Milo' });
 
   await page.goto(workspace.url + '/planning');
-  await expect(page.locator('.planning-month')).toHaveText('septembre 2026');
+  await expect(page.locator('.month-toolbar h2')).toHaveText('septembre 2026');
 
   await page.getByRole('button', { name: 'Créneau', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Nouveau créneau' });
@@ -100,7 +99,7 @@ test('planning : affiche le mois en cours et le prénom de l’enfant plutôt qu
 
   // Two parents of the same child both refer to just the child on the card — like
   // in the PDFs — not to whichever of them actually signed up for the shift.
-  const card = page.locator('.shift-card', { hasText: '08:00–12:00' });
+  const card = page.locator('.shift-pill', { hasText: '08:00' });
   await expect(card).toContainText('Milo');
   await expect(card).not.toContainText('Léa Martin');
   await expect(card).not.toHaveClass(/shift-present|shift-absent/);
