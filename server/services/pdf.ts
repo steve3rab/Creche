@@ -130,8 +130,8 @@ ${kind === 'pv' ? m.ordreDuJour.map((p, i) => `<section><h2>${i + 1}. ${e(p.titr
 }
 export async function generatePdf(store: Storage, id: string, kind: string) {
   await store.assertReady();
-  const m = await store.meeting(id),
-    c = await store.config();
+  const { meeting: m, file: reunionFile } = await store.meetingWithFile(id);
+  const c = await store.config();
   if (kind === 'pv') meetingWriteSchema.parse(m);
   const actions = (await store.list('actions')).filter(
     (a): a is Action => 'reunionSource' in a && a.reunionSource === id,
@@ -165,13 +165,14 @@ export async function generatePdf(store: Storage, id: string, kind: string) {
     await page.close();
   }
   await store.snapshot();
-  const file = `${await store.meetingDir(id)}/${pdfName(m, kind)}`;
+  const dir = reunionFile.replace(/\/reunion\.json$/, '');
+  const file = `${dir}/${pdfName(m, kind)}`;
   await atomicBytes(await store.safe(file), bytes);
   await atomicBytes(await store.safe(file.replace(/\.pdf$/, '.html')), Buffer.from(html));
   m.generations[kind] = new Date().toISOString();
   m.updatedAt = new Date().toISOString();
-  await atomicJson(await store.safe(await store.meetingFile(id)), m, meetingSchema);
-  return { meeting: m, url: `/api/reunions/${id}/pdf/${kind}`, name: pdfName(m, kind) };
+  await atomicJson(await store.safe(reunionFile), m, meetingSchema);
+  return { meeting: m, url: `/api/reunions/${id}/pdf/${kind}`, name: pdfName(m, kind), dir };
 }
 function linkedPvDocument(documents: (Document | Record<string, unknown>)[], meetingId: string) {
   return documents.find(
@@ -183,8 +184,8 @@ function linkedPvDocument(documents: (Document | Record<string, unknown>)[], mee
 // final, stamped version, then mirrored into Documents for easy access and sharing.
 export async function validateMeeting(store: Storage, id: string) {
   await store.setValidation(id, true);
-  const { meeting, name } = await generatePdf(store, id, 'pv');
-  const bytes = await fs.readFile(await store.safe(`${await store.meetingDir(id)}/${name}`));
+  const { meeting, name, dir } = await generatePdf(store, id, 'pv');
+  const bytes = await fs.readFile(await store.safe(`${dir}/${name}`));
   const existing = linkedPvDocument(await store.list('documents'), id);
   if (existing) {
     await atomicBytes(await store.safe(existing.fichier), bytes);

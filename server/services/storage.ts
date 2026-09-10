@@ -16,6 +16,7 @@ import {
   shiftTemplateSchema,
   type Collection,
   type Config,
+  type Meeting,
   type Shift,
 } from '../../src/domain/models.js';
 
@@ -234,12 +235,42 @@ export class Storage {
     }
     return result;
   }
-  async meetings() {
-    const files = (await this.files('reunions')).filter((f) => f.endsWith('/reunion.json'));
-    const items = await Promise.all(files.map((f) => this.read(f, meetingSchema)));
-    if (new Set(items.map((item) => item.id)).size !== items.length)
+  // Narrower than files('reunions'): only descends the year → meeting-folder levels
+  // and looks for reunion.json there, instead of also listing every PDF and HTML
+  // file each meeting folder holds. Used only to locate reunion.json files; anything
+  // that must see every file (backups, restore, orphan .tmp cleanup) still uses the
+  // generic files() walk below.
+  private async meetingFiles(): Promise<string[]> {
+    const base = 'reunions';
+    if (!(await exists(await this.safe(base)))) return [];
+    const result: string[] = [];
+    for (const year of await fs.readdir(await this.safe(base), { withFileTypes: true })) {
+      if (!year.isDirectory()) continue;
+      const yearRel = `${base}/${year.name}`;
+      for (const folder of await fs.readdir(await this.safe(yearRel), { withFileTypes: true })) {
+        if (!folder.isDirectory()) continue;
+        const fileRel = `${yearRel}/${folder.name}/reunion.json`;
+        if (await exists(await this.safe(fileRel))) result.push(fileRel);
+      }
+    }
+    return result;
+  }
+  // One scan of reunions/ that both lists and parses every meeting, shared by every
+  // method below instead of each re-walking and re-reading the tree on its own. Every
+  // file is still freshly read and validated on every call — this removes *redundant*
+  // re-scans within a single operation, never a re-read that matters for correctness
+  // (a corrupted reunion.json is still caught exactly where it would have been).
+  private async meetingIndex(): Promise<{ meetings: Meeting[]; files: Map<string, string> }> {
+    const entries = await Promise.all(
+      (await this.meetingFiles()).map(async (f) => [f, await this.read(f, meetingSchema)] as const),
+    );
+    const meetings = entries.map(([, m]) => m);
+    if (new Set(meetings.map((m) => m.id)).size !== meetings.length)
       throw new DataError('Identifiants de réunions dupliqués. Restaurez une sauvegarde.', 422);
-    return items;
+    return { meetings, files: new Map(entries.map(([f, m]) => [m.id, f])) };
+  }
+  async meetings() {
+    return (await this.meetingIndex()).meetings;
   }
   async meeting(id: string) {
     const m = (await this.meetings()).find((x) => x.id === id);
@@ -247,13 +278,22 @@ export class Storage {
     return m;
   }
   async meetingFile(id: string) {
-    for (const f of (await this.files('reunions')).filter((f) => f.endsWith('/reunion.json'))) {
-      if ((await this.read(f, meetingSchema)).id === id) return f;
-    }
-    throw new DataError('Réunion introuvable', 404);
+    const file = (await this.meetingIndex()).files.get(id);
+    if (!file) throw new DataError('Réunion introuvable', 404);
+    return file;
   }
   async meetingDir(id: string) {
     return (await this.meetingFile(id)).replace(/\/reunion\.json$/, '');
+  }
+  // For callers that need both the meeting and its file path (PDF generation and
+  // serving): one shared scan instead of meeting() and meetingFile() each re-walking
+  // reunions/ independently.
+  async meetingWithFile(id: string): Promise<{ meeting: Meeting; file: string }> {
+    const index = await this.meetingIndex();
+    const meeting = index.meetings.find((m) => m.id === id);
+    const file = index.files.get(id);
+    if (!meeting || !file) throw new DataError('Réunion introuvable', 404);
+    return { meeting, file };
   }
   async assertReady() {
     if (await exists(await this.safe('restauration-en-cours.json')))
@@ -393,8 +433,8 @@ export class Storage {
   async saveMeeting(value: unknown, create = false) {
     await this.assertReady();
     const m = meetingWriteSchema.parse(value);
-    const all = await this.meetings();
-    const old = all.find((x) => x.id === m.id);
+    const index = await this.meetingIndex();
+    const old = index.meetings.find((x) => x.id === m.id);
     if (create && old) throw new DataError('Identifiant déjà utilisé', 409);
     if (!create && !old) throw new DataError('Réunion introuvable', 404);
     if (old?.pvValideLe)
@@ -422,22 +462,26 @@ export class Storage {
   }
   async setValidation(id: string, validate: boolean) {
     await this.assertReady();
-    const m = await this.meeting(id);
+    const index = await this.meetingIndex();
+    const m = index.meetings.find((x) => x.id === id);
+    if (!m) throw new DataError('Réunion introuvable', 404);
     if (validate) meetingWriteSchema.parse(m);
     await this.snapshot();
     m.pvValideLe = validate ? new Date().toISOString() : null;
     m.statut = validate ? 'CLOTUREE' : 'PV_A_VALIDER';
     m.updatedAt = new Date().toISOString();
-    await atomicJson(await this.safe(await this.meetingFile(id)), m, meetingSchema);
+    await atomicJson(await this.safe(index.files.get(id)!), m, meetingSchema);
     return m;
   }
   async setArchive(id: string, archive: boolean) {
     await this.assertReady();
-    const m = await this.meeting(id);
+    const index = await this.meetingIndex();
+    const m = index.meetings.find((x) => x.id === id);
+    if (!m) throw new DataError('Réunion introuvable', 404);
     await this.snapshot();
     m.archive = archive;
     m.updatedAt = new Date().toISOString();
-    await atomicJson(await this.safe(await this.meetingFile(id)), m, meetingSchema);
+    await atomicJson(await this.safe(index.files.get(id)!), m, meetingSchema);
     return m;
   }
   async saveRecord<K extends Collection>(
@@ -470,9 +514,11 @@ export class Storage {
     await this.snapshot();
     const tid = randomUUID();
     if (name === 'reunions') {
-      const m = await this.meeting(id);
+      const index = await this.meetingIndex();
+      const m = index.meetings.find((x) => x.id === id);
+      if (!m) throw new DataError('Réunion introuvable', 404);
       if (m.pvValideLe) throw new DataError('Rouvrez le PV validé avant suppression.', 409);
-      const original = await this.meetingDir(id);
+      const original = index.files.get(id)!.replace(/\/reunion\.json$/, '');
       await atomicJson(
         await this.safe(`corbeille/${tid}/meta.json`),
         {
@@ -612,8 +658,18 @@ export class Storage {
     return { ok: true, count: targeted.length };
   }
   async trash() {
-    const files = (await this.files('corbeille')).filter((x) => x.endsWith('/meta.json'));
-    return Promise.all(files.map((f) => this.read(f, trashSchema)));
+    // Each trash entry is one folder holding a small meta.json plus its actual trashed
+    // content (a whole meeting folder, or a document's bytes); only the top level is
+    // listed here instead of recursing into that content too, which files() would do.
+    const base = 'corbeille';
+    if (!(await exists(await this.safe(base)))) return [];
+    const result: z.infer<typeof trashSchema>[] = [];
+    for (const entry of await fs.readdir(await this.safe(base), { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue;
+      const metaRel = `${base}/${entry.name}/meta.json`;
+      if (await exists(await this.safe(metaRel))) result.push(await this.read(metaRel, trashSchema));
+    }
+    return result;
   }
   async restoreTrash(id: string) {
     await this.assertReady();

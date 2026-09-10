@@ -153,8 +153,9 @@ export async function createApp(options: { configDir: string; workspace?: string
   });
   app.get('/api/reunions/:id/pdf/:kind', async (req, res) => {
     const kind = z.enum(['convocation', 'ordre-du-jour', 'pv']).parse(req.params.kind),
-      m = await db().meeting(id(req.params.id));
-    res.type('pdf').sendFile(await db().safe(`${await db().meetingDir(m.id)}/${pdfName(m, kind)}`));
+      { meeting: m, file } = await db().meetingWithFile(id(req.params.id));
+    const dir = file.replace(/\/reunion\.json$/, '');
+    res.type('pdf').sendFile(await db().safe(`${dir}/${pdfName(m, kind)}`));
   });
   app.post('/api/reunions/:id/valider', async (req, res) =>
     res.json(await db().serial(() => validateMeeting(db(), id(req.params.id)))),

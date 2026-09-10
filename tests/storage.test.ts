@@ -133,6 +133,18 @@ describe('Stockage réel dans un répertoire temporaire', () => {
     expect((await s.meeting(m.id)).lieu).toBe('Salle verte');
     expect(await s.verify()).toEqual({ ok: true });
   });
+  it('retrouve une réunion et son fichier malgré les PDF et HTML voisins dans son dossier', async () => {
+    const m = await s.saveMeeting(newMeeting(), true);
+    const dir = await s.meetingDir(m.id);
+    for (const name of ['Convocation.pdf', 'OrdreDuJour.pdf', 'PV.pdf', 'PV.html'])
+      await fs.writeFile(await s.safe(`${dir}/${name}`), 'contenu factice');
+    expect(await s.meetings()).toHaveLength(1);
+    expect((await s.meeting(m.id)).id).toBe(m.id);
+    const { meeting, file } = await s.meetingWithFile(m.id);
+    expect(meeting.id).toBe(m.id);
+    expect(file).toBe(await s.meetingFile(m.id));
+    await expect(s.meetingWithFile(crypto.randomUUID())).rejects.toThrow('introuvable');
+  });
   it('sauvegarde et restaure un état complet', async () => {
     let m = await s.saveMeeting(newMeeting(), true);
     const b = await s.snapshot();
