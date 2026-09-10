@@ -546,6 +546,12 @@ watch(
         class="full text-link"
         >Ouvrir la réunion source</RouterLink
       >
+      <RouterLink
+        v-if="kind === 'actions' && draft.noteSource"
+        :to="'/notes?id=' + draft.noteSource"
+        class="full text-link"
+        >Ouvrir la note source</RouterLink
+      >
       <p v-if="formError" role="alert" class="error full">{{ formError }}</p>
       <footer class="full">
         <button
