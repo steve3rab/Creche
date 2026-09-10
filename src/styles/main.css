@@ -1331,6 +1331,9 @@ details textarea {
   color: var(--accent-contrast);
 }
 .shift-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-weight: 650;
 }
 .shift-add {

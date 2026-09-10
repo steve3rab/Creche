@@ -2,6 +2,8 @@
 
 Une application Windows pour préparer les réunions, rédiger les procès-verbaux et conserver la mémoire d’une crèche parentale. Interface ardoise et sauge, conçue pour Microsoft Edge dans une fenêtre de **879 × 645 pixels**. Le tableau de bord occupe aussi toute la largeur dans une grande fenêtre. Aucun compte, aucune base de données, aucun service distant.
 
+[**Aperçu en images**](docs/apercu.md) : une capture d’écran par espace de l’application.
+
 ## Prérequis
 
 - Windows 10 ou 11 et Microsoft Edge installé.
@@ -25,7 +27,7 @@ npm.cmd run build
 
 **Double-cliquer sur `Demarrer.cmd`.** Le lanceur installe les dépendances et compile si nécessaire, puis démarre l’application et ouvre Edge.
 
-L’adresse locale par défaut est **http://127.0.0.1:4317**. Si Edge ne s’ouvre pas automatiquement, saisir cette adresse dans Edge. Le serveur démarre en arrière-plan et la fenêtre du lanceur se ferme automatiquement. Un second double-clic ouvre l’instance déjà démarrée. Le lanceur vérifie l’identité du serveur, empêche les démarrages simultanés et recompile les sources modifiées au prochain démarrage. Ses erreurs sont affichées dans la console ; celles du serveur sont conservées dans `.local/demarrage.log`. Fermer l’onglet Edge ne supprime aucune donnée.
+L’adresse locale par défaut est **http://127.0.0.1:4317**. Si Edge ne s’ouvre pas automatiquement, saisir cette adresse dans Edge. Le serveur démarre en arrière-plan et la fenêtre du lanceur se ferme automatiquement. Le lanceur vérifie l’identité du serveur et empêche les démarrages simultanés. À chaque double-clic, il compare une empreinte du code source à celle utilisée lors du dernier démarrage : si rien n’a changé, l’instance déjà en cours s’ouvre aussitôt sans reconstruction ; si le code a changé depuis, il arrête proprement cette instance (fermeture normale, y compris du moteur PDF), recompile, puis redémarre — même si l’instance précédente tournait encore en arrière-plan. Ses erreurs sont affichées dans la console ; celles du serveur sont conservées dans `.local/demarrage.log`. Fermer l’onglet Edge ne supprime aucune donnée.
 
 Le raccourci **Filoustics** du Bureau utilise ce même lanceur. Node.js et Edge doivent rester installés. Pour diagnostiquer le démarrage sans ouvrir de fenêtre : `node scripts/launch.mjs --check`.
 
@@ -50,7 +52,7 @@ Choisir un répertoire **hors OneDrive, Dropbox ou autre dossier synchronisé**,
 - **Agenda** : dates de début et de fin, identiques par défaut. Une période (catégorie « Vacances » par exemple) apparaît chaque jour, début et fin inclus. Les événements en cours restent visibles sur l’accueil. Les liens vers une réunion et une action sont regroupés sur une même ligne. Les réunions et échéances d’actions apparaissent aussi automatiquement ; leur sélection ouvre leur fiche source.
 - **Documents** : import, ouverture, renommage, changement de catégorie, archivage et corbeille. Formats acceptés : PDF, TXT, PNG, JPG, JPEG, DOCX, XLSX, ODT et ODS, jusqu’à 20 Mo. Les PDF, images et textes s’ouvrent dans Edge ; les formats bureautiques sont proposés au téléchargement. L’application n’exécute jamais un fichier importé.
 - **Membres** : nom et prénom dans un seul champ, prénom de l’enfant facultatif, fonction et coordonnées utiles au secrétariat. Pas de dates d’entrée ou de sortie à renseigner.
-- **Planning** : emploi du temps hebdomadaire des créneaux de garde, chacun associé à un membre responsable, avec heure de début et de fin. Navigation semaine par semaine ; un créneau s’ouvre en cliquant dessus pour être modifié ou supprimé (récupérable depuis la corbeille).
+- **Planning** : emploi du temps hebdomadaire des créneaux de garde, chacun associé à un membre responsable, avec heure de début et de fin. Navigation semaine par semaine ; un créneau s’ouvre en cliquant dessus pour être modifié ou supprimé (récupérable depuis la corbeille). Un créneau peut se **répéter chaque semaine** jusqu’à une date choisie (deux ans au maximum) : la même personne et le même horaire couvrent alors toutes les semaines concernées en une seule saisie. Modifier ou supprimer une occurrence d’une répétition propose ensuite le choix entre « cette occurrence seulement » et « cette occurrence et toutes les suivantes », pour ajuster une exception ponctuelle sans toucher au reste de l’année ou, au contraire, répercuter un changement durable sur toutes les semaines à venir.
 - **Contacts** : répertoire des interlocuteurs extérieurs à l’association (CAF, PMI, mairie, assurance, fournisseurs…), avec structure, fonction et coordonnées. Distinct des Membres, qui reste réservé au bureau et aux adhérents.
 - **Recherche** : réunions, documents, membres, actions, dates importantes, créneaux de planning et contacts.
 - **Notes** : création, lecture et modification de notes avec catégorie libre et niveau Normal, Important ou Prioritaire. Recherche dans le titre et le contenu, filtres cumulables par catégorie et importance, tris par modification (récente ou ancienne), titre, importance et catégorie. Les notes apparaissent aussi dans la recherche globale et sont protégées par les sauvegardes et la corbeille.
