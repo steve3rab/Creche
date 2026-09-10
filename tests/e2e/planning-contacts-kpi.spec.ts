@@ -31,6 +31,55 @@ test('planning : création, modification et suppression récupérable d’un cr�
   expect(await workspace.store.list('planning')).toEqual([]);
 });
 
+test('planning : série hebdomadaire — création, modification et suppression des occurrences futures', async ({
+  page,
+  workspace,
+}) => {
+  await page.getByRole('link', { name: 'Planning', exact: true }).click();
+  await page.getByRole('button', { name: 'Créneau', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Nouveau créneau' });
+  await dialog.getByLabel('Responsable', { exact: true }).selectOption({ label: 'Léa Martin' });
+  await dialog.getByLabel('Heure de début', { exact: true }).fill('08:00');
+  await dialog.getByLabel('Heure de fin', { exact: true }).fill('12:00');
+  await dialog.getByLabel('Se répète chaque semaine').check();
+  await dialog.getByLabel('Jusqu’au', { exact: true }).fill('2026-09-28');
+  await dialog.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Créneaux enregistrés pour toute la période');
+  await expect(page.getByText('08:00–12:00')).toBeVisible();
+  expect(await workspace.store.list('planning')).toHaveLength(4);
+
+  await page.getByRole('button', { name: 'Semaine suivante' }).click();
+  await expect(page.getByText('08:00–12:00')).toBeVisible();
+
+  await page.getByText('08:00–12:00').click();
+  const editDialog = page.getByRole('dialog', { name: 'Modifier le créneau' });
+  await expect(editDialog.getByText('répétition hebdomadaire')).toBeVisible();
+  await editDialog
+    .getByLabel('Appliquer les changements à', { exact: true })
+    .selectOption('suivantes');
+  await editDialog.getByLabel('Heure de début', { exact: true }).fill('09:00');
+  await editDialog.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Créneaux mis à jour à partir de cette date');
+  await expect(page.getByText('09:00–12:00')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Semaine précédente' }).click();
+  await expect(page.getByText('08:00–12:00')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Semaine suivante' }).click();
+  await page.getByText('09:00–12:00').click();
+  const deleteDialog = page.getByRole('dialog', { name: 'Modifier le créneau' });
+  await deleteDialog
+    .getByLabel('Appliquer les changements à', { exact: true })
+    .selectOption('suivantes');
+  await deleteDialog.getByRole('button', { name: 'Supprimer', exact: true }).click();
+  const confirm = page.getByRole('dialog', { name: 'Confirmer l’action' });
+  await confirm.getByRole('button', { name: 'Confirmer', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Créneaux déplacés dans la corbeille');
+
+  const remaining = await workspace.store.list('planning');
+  expect(remaining.map((s) => s.date)).toEqual(['2026-09-07']);
+});
+
 test('planning : refuse une heure de fin antérieure à l’heure de début', async ({ page }) => {
   await page.getByRole('link', { name: 'Planning', exact: true }).click();
   await page.getByRole('button', { name: 'Créneau', exact: true }).click();

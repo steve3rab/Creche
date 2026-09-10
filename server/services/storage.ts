@@ -11,9 +11,28 @@ import {
   meetingFolder,
   meetingSchema,
   migrate,
+  shiftPatchSchema,
+  shiftSchema,
+  shiftTemplateSchema,
   type Collection,
   type Config,
+  type Shift,
 } from '../../src/domain/models.js';
+
+// Same-weekday, weekly dates from start to end (both inclusive), computed on local
+// calendar days (noon anchor) so no DST transition can shift a date by one day.
+function weeklyDates(start: string, until: string): string[] {
+  const dates: string[] = [];
+  const cursor = new Date(`${start}T12:00:00`);
+  const end = new Date(`${until}T12:00:00`);
+  while (cursor.getTime() <= end.getTime()) {
+    dates.push(
+      `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`,
+    );
+    cursor.setDate(cursor.getDate() + 7);
+  }
+  return dates;
+}
 
 // Older workspaces and backups predate these collections; reads and backups treat a
 // missing file as empty rather than corrupt.
@@ -189,7 +208,9 @@ export class Storage {
   async config() {
     return this.read('config.json', configSchema);
   }
-  async list(name: Collection) {
+  async list<K extends Collection>(
+    name: K,
+  ): Promise<Array<z.infer<(typeof collectionSchemas)[K]>>> {
     if (optionalCollections.includes(name) && !(await exists(await this.safe(`${name}.json`))))
       return [];
     const items = (await this.read(`${name}.json`, envelope(collectionSchemas[name]))).items;
@@ -419,10 +440,14 @@ export class Storage {
     await atomicJson(await this.safe(await this.meetingFile(id)), m, meetingSchema);
     return m;
   }
-  async saveRecord(name: Collection, value: unknown, create = false) {
+  async saveRecord<K extends Collection>(
+    name: K,
+    value: unknown,
+    create = false,
+  ): Promise<z.infer<(typeof collectionSchemas)[K]>> {
     await this.assertReady();
     const schema = collectionSchemas[name];
-    const v = schema.parse(value),
+    const v = schema.parse(value) as z.infer<(typeof collectionSchemas)[K]>,
       rows = await this.list(name),
       i = rows.findIndex((r) => r.id === v.id);
     if (create && i !== -1) throw new DataError('Identifiant déjà utilisé', 409);
@@ -499,6 +524,92 @@ export class Storage {
       );
     }
     return { ok: true };
+  }
+  // Materializes a weekly-repeating shift as one record per week — the same members
+  // usually cover the same slot all year, so a single form fills the whole series
+  // instead of one save per week; each occurrence stays independently editable.
+  async saveShiftSeries(template: unknown): Promise<Shift[]> {
+    await this.assertReady();
+    const t = shiftTemplateSchema.parse(template);
+    const dates = weeklyDates(t.date, t.jusquau);
+    if (dates.length > 104)
+      throw new DataError('La répétition est limitée à deux ans (104 semaines).', 400);
+    const serieId = randomUUID();
+    const now = new Date().toISOString();
+    const created = dates.map((date) =>
+      shiftSchema.parse({
+        schemaVersion: 1,
+        id: randomUUID(),
+        createdAt: now,
+        updatedAt: now,
+        date,
+        heureDebut: t.heureDebut,
+        heureFin: t.heureFin,
+        membreId: t.membreId,
+        membre: t.membre,
+        notes: t.notes,
+        serieId,
+      }),
+    );
+    await this.snapshot();
+    const rows = await this.list('planning');
+    await atomicJson(
+      await this.safe('planning.json'),
+      { schemaVersion: 1, items: [...rows, ...created] },
+      envelope(shiftSchema),
+    );
+    return created;
+  }
+  async updateShiftSeries(serieId: string, fromDate: string, patch: unknown): Promise<Shift[]> {
+    await this.assertReady();
+    const p = shiftPatchSchema.parse(patch);
+    const rows = await this.list('planning');
+    if (!rows.some((r) => r.serieId === serieId && r.date >= fromDate))
+      throw new DataError('Série introuvable', 404);
+    await this.snapshot();
+    const now = new Date().toISOString();
+    const updated = rows.map((r) =>
+      r.serieId === serieId && r.date >= fromDate
+        ? shiftSchema.parse({ ...r, ...p, updatedAt: now })
+        : r,
+    );
+    await atomicJson(
+      await this.safe('planning.json'),
+      { schemaVersion: 1, items: updated },
+      envelope(shiftSchema),
+    );
+    return updated.filter((r) => r.serieId === serieId && r.date >= fromDate);
+  }
+  async deleteShiftSeries(serieId: string, fromDate: string) {
+    await this.assertReady();
+    const rows = await this.list('planning');
+    const targeted = rows.filter((r) => r.serieId === serieId && r.date >= fromDate);
+    if (!targeted.length) throw new DataError('Série introuvable', 404);
+    await this.snapshot();
+    for (const item of targeted) {
+      const tid = randomUUID();
+      await atomicJson(
+        await this.safe(`corbeille/${tid}/meta.json`),
+        {
+          schemaVersion: 1,
+          id: tid,
+          original: 'planning.json',
+          label: `${item.date} ${item.heureDebut}–${item.heureFin}`,
+          date: new Date().toISOString(),
+          kind: 'record',
+          collection: 'planning',
+          record: item,
+        },
+        trashSchema,
+      );
+    }
+    const remaining = rows.filter((r) => !(r.serieId === serieId && r.date >= fromDate));
+    await atomicJson(
+      await this.safe('planning.json'),
+      { schemaVersion: 1, items: remaining },
+      envelope(shiftSchema),
+    );
+    return { ok: true, count: targeted.length };
   }
   async trash() {
     const files = (await this.files('corbeille')).filter((x) => x.endsWith('/meta.json'));

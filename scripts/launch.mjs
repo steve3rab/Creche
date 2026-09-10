@@ -8,6 +8,8 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const local = path.join(root, '.local');
 const url = 'http://127.0.0.1:4317';
 const lock = path.join(local, 'launch.lock');
+const marker = path.join(local, 'build.sha256');
+const pidFile = path.join(local, 'server.pid');
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function health() {
   try {
@@ -104,6 +106,38 @@ async function dependenciesReady() {
     return false;
   }
 }
+// Asks the running instance to stop through its own shutdown route — this runs its
+// normal cleanup (closing the shared PDF browser) from inside that process, which a
+// cross-process kill signal cannot reliably trigger on Windows. Falls back to a hard
+// stop only if the instance does not actually go away.
+async function stopRunningServer() {
+  try {
+    await fetch(`${url}/api/arreter`, { method: 'POST', signal: AbortSignal.timeout(3000) });
+  } catch {
+    /* The instance may already be gone, or briefly unresponsive; the poll below decides. */
+  }
+  // A process actively shutting down can make a request fail in ways health() doesn't
+  // recognize (reset mid-response, timeout) as well as the plain "port closed" it does;
+  // either is expected here, so keep waiting instead of treating it as fatal.
+  const confirmedDown = async () => {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      if (!(await health().catch(() => true))) return true;
+      await sleep(300);
+    }
+    return false;
+  };
+  if (await confirmedDown()) return;
+  const pid = Number(await fs.readFile(pidFile, 'utf8').catch(() => ''));
+  if (Number.isInteger(pid) && pid > 0) {
+    try {
+      process.kill(pid);
+    } catch (error) {
+      if (error.code !== 'ESRCH') throw error;
+    }
+  }
+  if (await confirmedDown()) return;
+  throw new Error('Impossible d’arrêter l’instance précédente de Filoustics.');
+}
 async function main() {
   const [major, minor] = process.versions.node.split('.').map(Number);
   if (major < 24 || (major === 24 && minor < 13))
@@ -112,11 +146,21 @@ async function main() {
     console.log((await health()) ? 'Filoustics est disponible.' : 'Filoustics est arrêté.');
     return;
   }
-  if (await health()) {
-    await openBrowser();
-    return;
-  }
   await fs.mkdir(local, { recursive: true });
+  // Computed once and reused: cheap (a source-tree hash), but still only worth doing
+  // when we might actually skip work because of it.
+  const digest = await fingerprint();
+  const fresh = async () =>
+    (await exists(path.join(root, 'dist', 'index.html'))) &&
+    (await exists(path.join(root, 'dist-server', 'server', 'index.js'))) &&
+    (await fs.readFile(marker, 'utf8').catch(() => '')) === digest;
+  if (await health()) {
+    if (await fresh()) {
+      await openBrowser();
+      return;
+    }
+    console.log('Le code a changé depuis le dernier démarrage : reconstruction et redémarrage…');
+  }
   let owned = false;
   try {
     for (let attempt = 0; attempt < 180; attempt++) {
@@ -131,7 +175,7 @@ async function main() {
         break;
       } catch (error) {
         if (error.code !== 'EEXIST') throw error;
-        if (await health()) {
+        if ((await health()) && (await fresh())) {
           await openBrowser();
           return;
         }
@@ -152,17 +196,14 @@ async function main() {
     if (!owned)
       throw new Error('Un démarrage est déjà en cours. Réessayez dans quelques instants.');
     if (await health()) {
-      await openBrowser();
-      return;
+      if (await fresh()) {
+        await openBrowser();
+        return;
+      }
+      await stopRunningServer();
     }
     if (!(await dependenciesReady())) await npm(['ci']);
-    const digest = await fingerprint();
-    const marker = path.join(local, 'build.sha256');
-    if (
-      (await fs.readFile(marker, 'utf8').catch(() => '')) !== digest ||
-      !(await exists(path.join(root, 'dist', 'index.html'))) ||
-      !(await exists(path.join(root, 'dist-server', 'server', 'index.js')))
-    ) {
+    if (!(await fresh())) {
       console.log('Préparation de l’application…');
       await npm(['run', 'build']);
       await fs.writeFile(marker, digest);
@@ -192,6 +233,7 @@ async function main() {
       failure = error;
     });
     child.unref();
+    if (child.pid) await fs.writeFile(pidFile, String(child.pid));
     for (let attempt = 0; attempt < 60; attempt++) {
       if (failure) throw failure;
       if (await health()) {

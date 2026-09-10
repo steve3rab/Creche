@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import http from 'node:http';
 import net from 'node:net';
@@ -8,6 +8,10 @@ import type { Server } from 'node:http';
 import { createApp } from '../server/app';
 import { Storage } from '../server/services/storage';
 import { configSchema } from '../src/domain/models';
+
+// The route under test calls process.exit(0) in real use (via services/lifecycle);
+// mocking it here lets the route's behavior be tested without killing this worker.
+vi.mock('../server/services/lifecycle', () => ({ shutdown: vi.fn(async () => {}) }));
 
 // Binds an ephemeral port so parallel test files/workers never collide, unlike the
 // fixed port the Playwright e2e suite uses under its single-worker constraint.
@@ -62,6 +66,14 @@ describe('Serveur Express réel : garde-fous réseau', () => {
       req.end();
     });
     expect(status).toBe(403);
+  });
+
+  it('permet un arrêt propre à distance, réservé au lanceur local', async () => {
+    const { shutdown } = await import('../server/services/lifecycle');
+    const res = await fetch(base + '/api/arreter', { method: 'POST' });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+    await vi.waitFor(() => expect(shutdown).toHaveBeenCalledTimes(1));
   });
 });
 
@@ -205,6 +217,93 @@ describe('Planning et contacts : routes REST génériques', () => {
     });
     expect(remove.status).toBe(200);
     expect(await (await fetch(base + '/api/contacts')).json()).toEqual([]);
+  });
+});
+
+describe('Récurrence hebdomadaire des créneaux de garde', () => {
+  it('crée une série, modifie et supprime les occurrences futures seulement', async () => {
+    const membreId = crypto.randomUUID();
+    const create = await fetch(base + '/api/planning/serie', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date: '2026-09-01',
+        jusquau: '2026-09-15',
+        heureDebut: '08:00',
+        heureFin: '12:00',
+        membreId,
+        membre: 'Léa Martin',
+        notes: '',
+      }),
+    });
+    expect(create.status).toBe(200);
+    const created = (await create.json()) as { id: string; date: string; serieId: string }[];
+    expect(created.map((c) => c.date)).toEqual(['2026-09-01', '2026-09-08', '2026-09-15']);
+    const serieId = created[0].serieId;
+    expect(created.every((c) => c.serieId === serieId)).toBe(true);
+
+    const update = await fetch(base + `/api/planning/serie/${serieId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fromDate: '2026-09-08',
+        heureDebut: '09:00',
+        heureFin: '13:00',
+        membreId,
+        membre: 'Léa Martin',
+        notes: 'Changement',
+      }),
+    });
+    expect(update.status).toBe(200);
+    const updated = (await update.json()) as { date: string; heureDebut: string }[];
+    expect(updated.map((u) => u.date)).toEqual(['2026-09-08', '2026-09-15']);
+    expect(updated.every((u) => u.heureDebut === '09:00')).toBe(true);
+
+    const list = (await (await fetch(base + '/api/planning')).json()) as { date: string }[];
+    expect(list.find((s) => s.date === '2026-09-01')).toMatchObject({ heureDebut: '08:00' });
+
+    const remove = await fetch(base + `/api/planning/serie/${serieId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirm: true, fromDate: '2026-09-08' }),
+    });
+    expect(remove.status).toBe(200);
+    expect(await remove.json()).toMatchObject({ ok: true, count: 2 });
+    const remaining = (await (await fetch(base + '/api/planning')).json()) as { date: string }[];
+    expect(remaining.map((s) => s.date)).toEqual(['2026-09-01']);
+  });
+
+  it('refuse une série dépassant deux ans et une date de fin antérieure au début', async () => {
+    const membreId = crypto.randomUUID();
+    const tooLong = await fetch(base + '/api/planning/serie', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date: '2026-01-01',
+        jusquau: '2029-01-01',
+        heureDebut: '08:00',
+        heureFin: '12:00',
+        membreId,
+        membre: 'Léa Martin',
+        notes: '',
+      }),
+    });
+    expect(tooLong.status).toBe(400);
+
+    const inverted = await fetch(base + '/api/planning/serie', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date: '2026-09-15',
+        jusquau: '2026-09-01',
+        heureDebut: '08:00',
+        heureFin: '12:00',
+        membreId,
+        membre: 'Léa Martin',
+        notes: '',
+      }),
+    });
+    expect(inverted.status).toBe(400);
   });
 });
 

@@ -265,12 +265,50 @@ export const shiftSchema = z
     membreId: idSchema,
     membre: short.default(''),
     notes: text.default(''),
+    // Shared by every occurrence generated together by a weekly repetition; empty for
+    // a one-off slot. Lets an edit or deletion target "this one" vs "this and later".
+    serieId: z.union([idSchema, z.literal('')]).default(''),
   })
   .refine((s) => s.heureFin > s.heureDebut, {
     message: 'L’heure de fin doit être après l’heure de début.',
     path: ['heureFin'],
   });
 export type Shift = z.infer<typeof shiftSchema>;
+// A weekly-repeating shift is created from this compact template rather than by
+// sending every occurrence over the wire: the server expands it into individual
+// records (one per week, sharing a serieId), the way most calendar tools do.
+export const shiftTemplateSchema = z
+  .object({
+    date: dateSchema,
+    jusquau: dateSchema,
+    heureDebut: time,
+    heureFin: time,
+    membreId: idSchema,
+    membre: short.default(''),
+    notes: text.default(''),
+  })
+  .refine((t) => t.heureFin > t.heureDebut, {
+    message: 'L’heure de fin doit être après l’heure de début.',
+    path: ['heureFin'],
+  })
+  .refine((t) => t.jusquau >= t.date, {
+    message: 'La date de fin de répétition doit être postérieure ou égale à la date de début.',
+    path: ['jusquau'],
+  });
+export type ShiftTemplate = z.infer<typeof shiftTemplateSchema>;
+export const shiftPatchSchema = z
+  .object({
+    heureDebut: time,
+    heureFin: time,
+    membreId: idSchema,
+    membre: short.default(''),
+    notes: text.default(''),
+  })
+  .refine((p) => p.heureFin > p.heureDebut, {
+    message: 'L’heure de fin doit être après l’heure de début.',
+    path: ['heureFin'],
+  });
+export type ShiftPatch = z.infer<typeof shiftPatchSchema>;
 export const contactSchema = z.object({
   ...base,
   nom: short.min(1, 'Le nom est obligatoire.'),

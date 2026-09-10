@@ -16,7 +16,6 @@ import {
   glossaryEntrySchema,
   shiftSchema,
   contactSchema,
-  type Shift,
 } from '../src/domain/models';
 let dir: string, s: Storage;
 beforeEach(async () => {
@@ -317,7 +316,7 @@ describe('Stockage réel dans un répertoire temporaire', () => {
     expect(await s.list('planning')).toEqual([]);
   });
   it('crée, modifie et étiquette dans la corbeille un créneau de garde par sa date et son heure', async () => {
-    const shift = (await s.saveRecord(
+    const shift = await s.saveRecord(
       'planning',
       shiftSchema.parse({
         ...newBase(),
@@ -328,14 +327,99 @@ describe('Stockage réel dans un répertoire temporaire', () => {
         membre: 'Léa Martin',
       }),
       true,
-    )) as Shift;
-    const updated = (await s.saveRecord('planning', { ...shift, heureFin: '13:00' })) as Shift;
+    );
+    const updated = await s.saveRecord('planning', { ...shift, heureFin: '13:00' });
     expect(updated.heureFin).toBe('13:00');
     await s.deleteRecord('planning', shift.id);
     const [trash] = await s.trash();
     expect(trash.label).toBe('2026-09-15 08:00–13:00');
     await s.restoreTrash(trash.id);
     expect(await s.list('planning')).toMatchObject([{ heureFin: '13:00' }]);
+  });
+  it('crée une série hebdomadaire de créneaux partageant un serieId, bornée à deux ans', async () => {
+    const membreId = crypto.randomUUID();
+    const created = await s.saveShiftSeries({
+      date: '2026-09-01',
+      jusquau: '2026-09-22',
+      heureDebut: '08:00',
+      heureFin: '12:00',
+      membreId,
+      membre: 'Léa Martin',
+      notes: '',
+    });
+    expect(created.map((c) => c.date)).toEqual([
+      '2026-09-01',
+      '2026-09-08',
+      '2026-09-15',
+      '2026-09-22',
+    ]);
+    expect(new Set(created.map((c) => c.serieId)).size).toBe(1);
+    expect(new Set(created.map((c) => c.id)).size).toBe(created.length);
+    expect(await s.list('planning')).toHaveLength(4);
+    await expect(
+      s.saveShiftSeries({
+        date: '2026-01-01',
+        jusquau: '2028-06-01',
+        heureDebut: '08:00',
+        heureFin: '12:00',
+        membreId,
+        membre: 'Léa Martin',
+        notes: '',
+      }),
+    ).rejects.toThrow('deux ans');
+  });
+  it('modifie uniquement les occurrences futures d’une série', async () => {
+    const membreId = crypto.randomUUID();
+    const [first, , third] = await s.saveShiftSeries({
+      date: '2026-09-01',
+      jusquau: '2026-09-15',
+      heureDebut: '08:00',
+      heureFin: '12:00',
+      membreId,
+      membre: 'Léa Martin',
+      notes: '',
+    });
+    const updated = await s.updateShiftSeries(first.serieId, third.date, {
+      heureDebut: '09:00',
+      heureFin: '13:00',
+      membreId,
+      membre: 'Hugo Petit',
+      notes: 'Changement',
+    });
+    expect(updated).toHaveLength(1);
+    expect(updated[0]).toMatchObject({ id: third.id, heureDebut: '09:00', membre: 'Hugo Petit' });
+    const all = await s.list('planning');
+    expect(all.find((row) => row.id === first.id)).toMatchObject({
+      heureDebut: '08:00',
+      membre: 'Léa Martin',
+    });
+    expect(all.find((row) => row.id === third.id)).toMatchObject({
+      heureDebut: '09:00',
+      membre: 'Hugo Petit',
+    });
+  });
+  it('déplace les occurrences futures d’une série dans la corbeille, laisse le passé intact', async () => {
+    const membreId = crypto.randomUUID();
+    const [first, second, third] = await s.saveShiftSeries({
+      date: '2026-09-01',
+      jusquau: '2026-09-15',
+      heureDebut: '08:00',
+      heureFin: '12:00',
+      membreId,
+      membre: 'Léa Martin',
+      notes: '',
+    });
+    const result = await s.deleteShiftSeries(first.serieId, second.date);
+    expect(result.count).toBe(2);
+    const remaining = await s.list('planning');
+    expect(remaining).toMatchObject([{ id: first.id }]);
+    const trashed = await s.trash();
+    expect(trashed.map((t) => t.label).sort()).toEqual(
+      [second, third].map((x) => `${x.date} ${x.heureDebut}–${x.heureFin}`).sort(),
+    );
+    await expect(s.deleteShiftSeries(first.serieId, second.date)).rejects.toThrow(
+      'Série introuvable',
+    );
   });
   it('crée, recherche et supprime un contact de façon récupérable', async () => {
     const contact = await s.saveRecord(

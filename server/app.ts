@@ -24,6 +24,7 @@ import { validateBranding } from './services/pdf-branding.js';
 import { saveAction, saveNote } from './services/notes.js';
 import { saveGlossaryEntry } from './services/glossaire.js';
 import { streamBackupZip } from './services/zip.js';
+import { shutdown } from './services/lifecycle.js';
 
 const pointerSchema = z.object({ schemaVersion: z.literal(1), workspace: z.string().min(1) });
 export async function createApp(options: { configDir: string; workspace?: string; port: number }) {
@@ -191,6 +192,31 @@ export async function createApp(options: { configDir: string; workspace?: string
       res.json(await db().serial(() => db().deleteRecord(name, id(req.params.id))));
     });
   }
+  app.post('/api/planning/serie', async (req, res) =>
+    res.json(await db().serial(() => db().saveShiftSeries(req.body))),
+  );
+  app.put('/api/planning/serie/:serieId', async (req, res) => {
+    const body = z
+      .object({
+        fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      })
+      .passthrough()
+      .parse(req.body);
+    res.json(
+      await db().serial(() => db().updateShiftSeries(id(req.params.serieId), body.fromDate, body)),
+    );
+  });
+  app.delete('/api/planning/serie/:serieId', async (req, res) => {
+    const body = z
+      .object({
+        confirm: z.literal(true),
+        fromDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      })
+      .parse(req.body);
+    res.json(
+      await db().serial(() => db().deleteShiftSeries(id(req.params.serieId), body.fromDate)),
+    );
+  });
   app.get('/api/documents', async (_req, res) => res.json(await db().list('documents')));
   app.post('/api/documents', async (req, res) => {
     const { document, content } = z
@@ -325,6 +351,12 @@ export async function createApp(options: { configDir: string; workspace?: string
           throw e;
         }),
     );
+  });
+  // Lets the launcher stop a running instance cleanly before rebuilding it, instead of
+  // killing the process from outside and skipping the shared PDF browser's cleanup.
+  app.post('/api/arreter', async (_req, res) => {
+    res.json({ ok: true });
+    setImmediate(() => void shutdown());
   });
   app.use('/api', (_req, res) => res.status(404).json({ error: 'Opération inconnue' }));
   app.use(
