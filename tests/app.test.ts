@@ -220,6 +220,21 @@ describe('Planning et contacts : routes REST génériques', () => {
   });
 });
 
+describe('Export PDF du planning mensuel : validation du mois', () => {
+  it('refuse un numéro de mois qui n’existe pas (13, 00…) sans tenter de générer un PDF', async () => {
+    for (const month of ['2026-13', '2026-00', '2026-99']) {
+      const response = await fetch(base + '/api/planning/pdf/' + month);
+      expect(response.status).toBe(400);
+    }
+  });
+  it('refuse un format de mois incorrect', async () => {
+    for (const month of ['2026-9', '2026', 'invalide']) {
+      const response = await fetch(base + '/api/planning/pdf/' + month);
+      expect(response.status).toBe(400);
+    }
+  });
+});
+
 describe('Récurrence hebdomadaire des créneaux de garde', () => {
   it('crée une série, modifie et supprime les occurrences futures seulement', async () => {
     const membreId = crypto.randomUUID();

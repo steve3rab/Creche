@@ -5,6 +5,7 @@ import {
   pdfName,
   meetingTypeLabel,
   prettyDate,
+  shiftDisplayName,
   type Config,
   type Meeting,
   type Action,
@@ -14,7 +15,7 @@ import {
 } from '../../src/domain/models.js';
 import { atomicBytes, atomicJson, DataError, type Storage } from './storage.js';
 import { meetingSchema, configSchema, documentSchema } from '../../src/domain/models.js';
-import { brandDocument, footerHtml, getBrowser, measureBranding } from './pdf-branding.js';
+import { brandDocument, renderPdf } from './pdf-branding.js';
 import { childName, meetingWriteSchema } from '../../src/domain/participants.js';
 import { formatPvText } from '../../src/domain/pv-format.js';
 export const escapeHtml = (v: string) =>
@@ -22,6 +23,22 @@ export const escapeHtml = (v: string) =>
     /[&<>"']/g,
     (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!,
   );
+// Shared by every generated document (meeting PV/convocation/ordre du jour, planning) so the
+// two kinds can't silently drift apart in branding or typography.
+const documentBaseStyles = `
+@page{size:A4;margin:20mm 19mm 22mm}
+*{box-sizing:border-box}
+body{font:10.5pt/1.55 Arial,sans-serif;color:#263445;margin:0}
+header{border-bottom:2px solid #587b79;padding-bottom:15px;margin-bottom:25px}
+.brand{font-size:17pt;font-weight:700;color:#243b4a}
+.muted{color:#667687;font-size:9pt}
+h1{font-size:29pt;line-height:1.15;letter-spacing:-.7px;margin:0 0 9px;color:#203645}
+.subtitle{font-size:11pt;color:#597078;margin:0 0 20px}
+table{width:100%;border-collapse:collapse;font-size:9pt;margin:10px 0 20px;table-layout:fixed}
+th{text-align:left;background:#f1f5f6;color:#4f6673;font-size:8pt}
+td,th{padding:9px;border-bottom:1px solid #dfe6eb;vertical-align:top;overflow-wrap:anywhere;white-space:pre-wrap}
+tr{break-inside:avoid}thead{display:table-header-group}
+`;
 export function documentHtml(
   m: Meeting,
   c: Config,
@@ -82,14 +99,7 @@ function baseDocumentHtml(m: Meeting, c: Config, kind: string, actions: Action[]
     ? `<ol class="agenda">${plannedPoints.map((p) => `<li>${e(p.titre)}</li>`).join('')}</ol>`
     : '<p class="muted">Aucun point programmé.</p>';
   return `<!doctype html><html lang="fr"><head><meta charset="UTF-8"><title>${e(title)}</title><style>
-@page{size:A4;margin:20mm 19mm 22mm}
-*{box-sizing:border-box}
-body{font:10.5pt/1.55 Arial,sans-serif;color:#263445;margin:0}
-header{border-bottom:2px solid #587b79;padding-bottom:15px;margin-bottom:25px}
-.brand{font-size:17pt;font-weight:700;color:#243b4a}
-.muted{color:#667687;font-size:9pt}
-h1{font-size:29pt;line-height:1.15;letter-spacing:-.7px;margin:0 0 9px;color:#203645}
-.subtitle{font-size:11pt;color:#597078;margin:0 0 20px}
+${documentBaseStyles}
 h2{font-size:13pt;color:#294c59;margin:23px 0 10px;break-after:avoid}
 p{margin:7px 0;white-space:pre-wrap;overflow-wrap:anywhere}
 .meta{display:grid;grid-template-columns:1fr 1fr;background:#f1f5f6;border:1px solid #dde6e9;border-radius:5px;margin:0 0 22px;padding:13px 16px;gap:12px}
@@ -112,10 +122,6 @@ section h2{border-top:1px solid #dbe4e8;padding-top:14px}
 .rich-text h3,.rich-text h4,.rich-text h5,.rich-text h6{font-size:10.5pt}
 .vote{display:flex;gap:22px;border:1px solid #e0e7eb;border-radius:4px;padding:10px 13px;margin:10px 0;break-inside:avoid;font-size:9pt}
 .vote strong{font-size:12pt;color:#294c59}
-table{width:100%;border-collapse:collapse;font-size:9pt;margin:10px 0 20px;table-layout:fixed}
-th{text-align:left;background:#f1f5f6;color:#4f6673;font-size:8pt}
-td,th{padding:9px;border-bottom:1px solid #dfe6eb;vertical-align:top;overflow-wrap:anywhere}
-tr{break-inside:avoid}thead{display:table-header-group}
 .closing{border-top:1px solid #dbe4e8;margin-top:24px;padding-top:12px}
 .spontaneous{font-size:8pt;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#657984;margin-left:7px}
 </style></head><body>
@@ -141,30 +147,7 @@ export async function generatePdf(store: Storage, id: string, kind: string) {
     (member): member is Member => 'nomComplet' in member,
   );
   const html = documentHtml(m, c, kind, actions, members);
-  const browser = await getBrowser();
-  const page = await browser.newPage({ javaScriptEnabled: false });
-  let bytes: Buffer;
-  try {
-    page.setDefaultTimeout(15_000);
-    await page.route('**/*', (route) => route.abort());
-    const footerHeight = await measureBranding(page, c);
-    await page.setContent(html);
-    bytes = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      displayHeaderFooter: true,
-      headerTemplate: '<span></span>',
-      footerTemplate: footerHtml(c),
-      margin: {
-        top: '20mm',
-        bottom: `${Math.max(22, Math.ceil((footerHeight * 25.4) / 96) + 12)}mm`,
-        left: '19mm',
-        right: '19mm',
-      },
-    });
-  } finally {
-    await page.close();
-  }
+  const bytes = await renderPdf(html, c);
   await store.snapshot();
   const dir = reunionFile.replace(/\/reunion\.json$/, '');
   const file = `${dir}/${pdfName(m, kind)}`;
@@ -217,10 +200,6 @@ export async function reopenMeeting(store: Storage, id: string) {
   if (linked) await store.deleteRecord('documents', linked.id);
   return meeting;
 }
-function shiftDisplayName(shift: Shift, members: Member[]) {
-  const member = members.find((m) => m.id === shift.membreId);
-  return member?.prenomEnfant || member?.nomComplet || shift.membre || 'Non attribué';
-}
 function shiftDayLabel(date: string) {
   const label = new Date(`${date}T12:00:00`).toLocaleDateString('fr-FR', {
     weekday: 'long',
@@ -259,18 +238,7 @@ export function planningDocumentHtml(shifts: Shift[], members: Member[], config:
     : '<p class="muted">Aucun créneau enregistré pour ce mois.</p>';
   return brandDocument(
     `<!doctype html><html lang="fr"><head><meta charset="UTF-8"><title>Planning</title><style>
-@page{size:A4;margin:20mm 19mm 22mm}
-*{box-sizing:border-box}
-body{font:10.5pt/1.55 Arial,sans-serif;color:#263445;margin:0}
-header{border-bottom:2px solid #587b79;padding-bottom:15px;margin-bottom:25px}
-.brand{font-size:17pt;font-weight:700;color:#243b4a}
-.muted{color:#667687;font-size:9pt}
-h1{font-size:29pt;line-height:1.15;letter-spacing:-.7px;margin:0 0 9px;color:#203645}
-.subtitle{font-size:11pt;color:#597078;margin:0 0 20px}
-table{width:100%;border-collapse:collapse;font-size:9pt;margin:10px 0 20px;table-layout:fixed}
-th{text-align:left;background:#f1f5f6;color:#4f6673;font-size:8pt}
-td,th{padding:9px;border-bottom:1px solid #dfe6eb;vertical-align:top;overflow-wrap:anywhere}
-tr{break-inside:avoid}thead{display:table-header-group}
+${documentBaseStyles}
 </style></head><body>
 <header><div class="brand">${e(config.association)}</div><p class="muted">${e(config.adresse)}</p></header>
 <h1>Planning</h1><p class="subtitle">${e(monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1))}</p>
@@ -293,27 +261,6 @@ export async function generatePlanningPdf(store: Storage, month: string) {
     config,
     month,
   );
-  const browser = await getBrowser();
-  const page = await browser.newPage({ javaScriptEnabled: false });
-  try {
-    page.setDefaultTimeout(15_000);
-    await page.route('**/*', (route) => route.abort());
-    const footerHeight = await measureBranding(page, config);
-    await page.setContent(html);
-    return await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      displayHeaderFooter: true,
-      headerTemplate: '<span></span>',
-      footerTemplate: footerHtml(config),
-      margin: {
-        top: '20mm',
-        bottom: `${Math.max(22, Math.ceil((footerHeight * 25.4) / 96) + 12)}mm`,
-        left: '19mm',
-        right: '19mm',
-      },
-    });
-  } finally {
-    await page.close();
-  }
+  const bytes = await renderPdf(html, config);
+  return { bytes, association: config.association };
 }

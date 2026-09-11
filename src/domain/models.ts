@@ -463,3 +463,10 @@ export function prettyDate(v: string) {
       })
     : '—';
 }
+// Shared by the Planning calendar and its PDF export, so both always agree on who a shift
+// displays as : the responsible member's child (if known), else the member, else the shift's
+// own raw name (kept when a member has since been deleted), else an explicit placeholder.
+export function shiftDisplayName(shift: Shift, members: Member[]) {
+  const member = members.find((m) => m.id === shift.membreId);
+  return member?.prenomEnfant || member?.nomComplet || shift.membre || 'Non attribué';
+}
