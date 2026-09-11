@@ -10,6 +10,7 @@ import {
   type Action,
   type Document,
   type Member,
+  type Shift,
 } from '../../src/domain/models.js';
 import { atomicBytes, atomicJson, DataError, type Storage } from './storage.js';
 import { meetingSchema, configSchema, documentSchema } from '../../src/domain/models.js';
@@ -215,4 +216,104 @@ export async function reopenMeeting(store: Storage, id: string) {
   const linked = linkedPvDocument(await store.list('documents'), id);
   if (linked) await store.deleteRecord('documents', linked.id);
   return meeting;
+}
+function shiftDisplayName(shift: Shift, members: Member[]) {
+  const member = members.find((m) => m.id === shift.membreId);
+  return member?.prenomEnfant || member?.nomComplet || shift.membre || 'Non attribué';
+}
+function shiftDayLabel(date: string) {
+  const label = new Date(`${date}T12:00:00`).toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+export function planningDocumentHtml(shifts: Shift[], members: Member[], config: Config, month: string) {
+  const e = escapeHtml;
+  const monthLabel = new Date(`${month}-01T12:00:00`).toLocaleDateString('fr-FR', {
+    month: 'long',
+    year: 'numeric',
+  });
+  const byDate = new Map<string, Shift[]>();
+  for (const shift of [...shifts].sort(
+    (a, b) => a.date.localeCompare(b.date) || a.heureDebut.localeCompare(b.heureDebut),
+  )) {
+    let dayShifts = byDate.get(shift.date);
+    if (!dayShifts) byDate.set(shift.date, (dayShifts = []));
+    dayShifts.push(shift);
+  }
+  const rows = [...byDate.entries()]
+    .map(
+      ([date, dayShifts]) =>
+        `<tr><td>${e(shiftDayLabel(date))}</td><td>${dayShifts
+          .map(
+            (s) =>
+              `${e(s.heureDebut)}–${e(s.heureFin)} · ${e(shiftDisplayName(s, members))}${s.notes ? ' — ' + e(s.notes) : ''}`,
+          )
+          .join('<br>')}</td></tr>`,
+    )
+    .join('');
+  const body = rows
+    ? `<table><thead><tr><th style="width:38%">Date</th><th>Créneaux</th></tr></thead><tbody>${rows}</tbody></table>`
+    : '<p class="muted">Aucun créneau enregistré pour ce mois.</p>';
+  return brandDocument(
+    `<!doctype html><html lang="fr"><head><meta charset="UTF-8"><title>Planning</title><style>
+@page{size:A4;margin:20mm 19mm 22mm}
+*{box-sizing:border-box}
+body{font:10.5pt/1.55 Arial,sans-serif;color:#263445;margin:0}
+header{border-bottom:2px solid #587b79;padding-bottom:15px;margin-bottom:25px}
+.brand{font-size:17pt;font-weight:700;color:#243b4a}
+.muted{color:#667687;font-size:9pt}
+h1{font-size:29pt;line-height:1.15;letter-spacing:-.7px;margin:0 0 9px;color:#203645}
+.subtitle{font-size:11pt;color:#597078;margin:0 0 20px}
+table{width:100%;border-collapse:collapse;font-size:9pt;margin:10px 0 20px;table-layout:fixed}
+th{text-align:left;background:#f1f5f6;color:#4f6673;font-size:8pt}
+td,th{padding:9px;border-bottom:1px solid #dfe6eb;vertical-align:top;overflow-wrap:anywhere}
+tr{break-inside:avoid}thead{display:table-header-group}
+</style></head><body>
+<header><div class="brand">${e(config.association)}</div><p class="muted">${e(config.adresse)}</p></header>
+<h1>Planning</h1><p class="subtitle">${e(monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1))}</p>
+${body}
+</body></html>`,
+    config,
+  );
+}
+export async function generatePlanningPdf(store: Storage, month: string) {
+  await store.assertReady();
+  const [shifts, members, config] = await Promise.all([
+    store.list('planning'),
+    store.list('membres'),
+    store.config(),
+  ]);
+  const monthShifts = shifts.filter((s) => s.date.startsWith(month));
+  const html = planningDocumentHtml(
+    monthShifts,
+    members.filter((member): member is Member => 'nomComplet' in member),
+    config,
+    month,
+  );
+  const browser = await getBrowser();
+  const page = await browser.newPage({ javaScriptEnabled: false });
+  try {
+    page.setDefaultTimeout(15_000);
+    await page.route('**/*', (route) => route.abort());
+    const footerHeight = await measureBranding(page, config);
+    await page.setContent(html);
+    return await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      displayHeaderFooter: true,
+      headerTemplate: '<span></span>',
+      footerTemplate: footerHtml(config),
+      margin: {
+        top: '20mm',
+        bottom: `${Math.max(22, Math.ceil((footerHeight * 25.4) / 96) + 12)}mm`,
+        left: '19mm',
+        right: '19mm',
+      },
+    });
+  } finally {
+    await page.close();
+  }
 }

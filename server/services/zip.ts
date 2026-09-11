@@ -3,8 +3,8 @@ import { ZipArchive } from 'archiver';
 import type { Response } from 'express';
 import { DataError, exists, type Storage } from './storage.js';
 
-// Turns an association name into a filesystem/URL-safe token for the zip filename.
-function slug(value: string) {
+// Turns an association name into a filesystem/URL-safe token for a download filename.
+export function slug(value: string) {
   return (
     value
       .normalize('NFD')
