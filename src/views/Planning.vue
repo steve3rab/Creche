@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useRoute } from 'vue-router';
-import { ChevronLeft, ChevronRight, Plus, RepeatIcon } from 'lucide-vue-next';
+import { ChevronLeft, ChevronRight, Download, Plus, RepeatIcon } from 'lucide-vue-next';
 import { askConfirmation } from '../composables/confirmation';
 import { state, run, refresh } from '../composables/app';
 import { api } from '../services/api';
@@ -42,6 +42,7 @@ const monthLabel = computed(() =>
     year: 'numeric',
   }),
 );
+const pdfUrl = computed(() => `/api/planning/pdf/${monthValue.value}`);
 const monthDays = computed(() => {
   const [y, m] = monthValue.value.split('-').map(Number),
     first = new Date(y, m - 1, 1),
@@ -236,7 +237,15 @@ async function remove() {
       @click="changeMonth(1)"
     >
       <ChevronRight :size="18" /></button
-    ><button class="quiet-link push-right" @click="goToday">Aujourd’hui</button>
+    ><button class="quiet-link push-right" @click="goToday">Aujourd’hui</button
+    ><a
+      class="quiet-link"
+      :href="pdfUrl"
+      :download="'Planning_' + monthValue + '.pdf'"
+      :aria-label="'Télécharger le PDF du planning de ' + monthLabel"
+      :title="'Télécharger le PDF du planning de ' + monthLabel"
+      ><Download :size="12" />PDF</a
+    >
   </div>
   <div class="calendar planning-calendar">
     <div v-for="d in weekdayLabels" :key="d" class="weekday">{{ d }}</div>

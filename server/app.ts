@@ -19,11 +19,17 @@ import {
   type Collection,
   type Document,
 } from '../src/domain/models.js';
-import { documentHtml, generatePdf, reopenMeeting, validateMeeting } from './services/pdf.js';
+import {
+  documentHtml,
+  generatePdf,
+  generatePlanningPdf,
+  reopenMeeting,
+  validateMeeting,
+} from './services/pdf.js';
 import { validateBranding } from './services/pdf-branding.js';
 import { saveAction, saveNote } from './services/notes.js';
 import { saveGlossaryEntry } from './services/glossaire.js';
-import { streamBackupZip } from './services/zip.js';
+import { streamBackupZip, slug } from './services/zip.js';
 import { shutdown } from './services/lifecycle.js';
 
 const pointerSchema = z.object({ schemaVersion: z.literal(1), workspace: z.string().min(1) });
@@ -217,6 +223,16 @@ export async function createApp(options: { configDir: string; workspace?: string
     res.json(
       await db().serial(() => db().deleteShiftSeries(id(req.params.serieId), body.fromDate)),
     );
+  });
+  app.get('/api/planning/pdf/:month', async (req, res) => {
+    const month = z
+      .string()
+      .regex(/^\d{4}-\d{2}$/)
+      .parse(req.params.month);
+    const bytes = await generatePlanningPdf(db(), month);
+    const filename = `Planning_${slug((await db().config()).association)}_${month}.pdf`;
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.type('pdf').send(bytes);
   });
   app.get('/api/documents', async (_req, res) => res.json(await db().list('documents')));
   app.post('/api/documents', async (req, res) => {
