@@ -227,10 +227,10 @@ export async function createApp(options: { configDir: string; workspace?: string
   app.get('/api/planning/pdf/:month', async (req, res) => {
     const month = z
       .string()
-      .regex(/^\d{4}-\d{2}$/)
+      .regex(/^\d{4}-(0[1-9]|1[0-2])$/)
       .parse(req.params.month);
-    const bytes = await generatePlanningPdf(db(), month);
-    const filename = `Planning_${slug((await db().config()).association)}_${month}.pdf`;
+    const { bytes, association } = await generatePlanningPdf(db(), month);
+    const filename = `Planning_${slug(association)}_${month}.pdf`;
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.type('pdf').send(bytes);
   });

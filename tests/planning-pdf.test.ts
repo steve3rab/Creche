@@ -70,6 +70,20 @@ describe('PDF du planning mensuel', () => {
     expect(html).toContain('Aucun créneau enregistré pour ce mois.');
     expect(html).not.toContain('<table>');
   });
+  it('préserve visuellement les sauts de ligne d’une note sur plusieurs lignes', () => {
+    const léa = member({ nomComplet: 'Léa Martin' });
+    const html = planningDocumentHtml(
+      [shift({ membreId: léa.id, notes: 'Sortie piscine\nApporter le maillot' })],
+      [léa],
+      config,
+      '2026-09',
+    );
+    // Le saut de ligne doit survivre l'échappement HTML...
+    expect(html).toContain('Sortie piscine\nApporter le maillot');
+    // ...et la cellule qui le contient doit le restituer visuellement (sans quoi le
+    // comportement par défaut d'un <td> l'effacerait en un seul bloc de texte).
+    expect(html).toMatch(/td,th\{[^}]*white-space:pre-wrap/);
+  });
   it('affiche le nom et le mois de l’association dans l’en-tête', () => {
     const html = planningDocumentHtml([], [], config, '2026-09');
     expect(html).toContain('<div class="brand">Les Filoustics</div>');

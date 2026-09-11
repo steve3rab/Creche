@@ -12,6 +12,7 @@ import {
   shiftSchema,
   shiftTemplateSchema,
   shiftPatchSchema,
+  shiftDisplayName,
   type Shift,
 } from '../domain/models';
 import Modal from '../components/Modal.vue';
@@ -61,11 +62,11 @@ const monthDays = computed(() => {
   });
 });
 // Two parents of the same child both show up as the shift's "responsable"; displaying
-// the child's name instead — the same substitution the PDFs already make — means both
-// parents' shifts read as referring to the one child, not two different people.
+// the child's name instead — the same substitution the PDF export makes, via the shared
+// shiftDisplayName — means both parents' shifts read as referring to the one child, not two
+// different people.
 function shiftChildName(shift: Shift) {
-  const member = state.members.find((m) => m.id === shift.membreId);
-  return member?.prenomEnfant || member?.nomComplet || shift.membre || 'Non attribué';
+  return shiftDisplayName(shift, state.members);
 }
 const draft = ref<Shift | null>(null),
   isNew = ref(false),

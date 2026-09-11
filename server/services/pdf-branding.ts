@@ -64,6 +64,34 @@ export async function validateBranding(config: Config) {
 export function footerHtml(config: Config) {
   return `${signatureReset}<div style="width:100%;padding:0 19mm;${signatureStyle}"><div style="border-top:1px solid #dbe2e8;padding-top:8px"><div class="signature">${cleanSignature(config.signatureHtml)}</div><div style="margin-top:6px">Page <span class="pageNumber"></span> / <span class="totalPages"></span></div></div></div>`;
 }
+// Shared by every generated PDF (meeting documents, planning export) : renders branded HTML
+// into A4 PDF bytes, with the branding-driven footer height setting the bottom margin so the
+// signature never overlaps the page content.
+export async function renderPdf(html: string, config: Config): Promise<Buffer> {
+  const browser = await getBrowser();
+  const page = await browser.newPage({ javaScriptEnabled: false });
+  try {
+    page.setDefaultTimeout(15_000);
+    await page.route('**/*', (route) => route.abort());
+    const footerHeight = await measureBranding(page, config);
+    await page.setContent(html);
+    return await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      displayHeaderFooter: true,
+      headerTemplate: '<span></span>',
+      footerTemplate: footerHtml(config),
+      margin: {
+        top: '20mm',
+        bottom: `${Math.max(22, Math.ceil((footerHeight * 25.4) / 96) + 12)}mm`,
+        left: '19mm',
+        right: '19mm',
+      },
+    });
+  } finally {
+    await page.close();
+  }
+}
 export function brandDocument(html: string, config: Config) {
   const brand = config.logoDataUrl
     ? `<img class="logo" src="${config.logoDataUrl}" alt="Logo de l’association">`
